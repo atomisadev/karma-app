@@ -3,9 +3,11 @@ import {
   createLinkToken,
   exchangePublicToken,
   getTransactions,
+  sandboxCreateTransactions,
 } from "../services/plaid.service";
 import {
   ExchangePublicTokenSchema,
+  SandboxCreateTransactionsSchema,
   TransactionsQuerySchema,
 } from "../schemas/plaid.schema";
 
@@ -40,4 +42,22 @@ export const plaidRoutes = new Elysia({ prefix: "/api/plaid" })
       return { transactions: [], error: res.error };
     }
     return { transactions: res.transactions };
+  })
+  .post("/sandbox/createTransactions", async ({ body, set }) => {
+    const parsed = SandboxCreateTransactionsSchema.safeParse(body);
+    if (!parsed.success) {
+      set.status = 400;
+      return { ok: false, error: "Invalid body" };
+    }
+
+    const res = await sandboxCreateTransactions({
+      userId: demoUserId,
+      transactions: parsed.data.transactions,
+    });
+    if ("error" in res) {
+      set.status = 400;
+      return { ok: false, error: res.error };
+    }
+
+    return { ok: true };
   });

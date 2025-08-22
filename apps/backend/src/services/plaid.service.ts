@@ -83,3 +83,34 @@ export async function getTransactions({
 
   return { transactions: data.transactions };
 }
+
+export async function sandboxCreateTransactions({
+  userId,
+  transactions,
+}: {
+  userId: string;
+  transactions: {
+    amount: number;
+    datePosted: string;
+    dateTransacted: string;
+    description: string;
+    isoCurrencyCode?: string;
+  }[];
+}) {
+  const accessToken = accessTokens.get(userId);
+  if (!accessToken)
+    return { error: "No accessToken. Link account first." as const };
+
+  await plaid.sandboxTransactionsCreate({
+    access_token: accessToken,
+    transactions: transactions.map((t) => ({
+      amount: t.amount,
+      date_posted: t.datePosted,
+      date_transacted: t.dateTransacted,
+      description: t.description,
+      iso_currency_code: t.isoCurrencyCode,
+    })),
+  });
+
+  return { ok: true };
+}
