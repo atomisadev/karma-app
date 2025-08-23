@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { eden } from "@/lib/api";
+import { useAuth } from "@clerk/nextjs";
 
 export type TransactionInput = {
   amount: number;
@@ -25,6 +26,7 @@ export function useAdminTransactions() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const { getToken, isSignedIn } = useAuth();
 
   const addRow = () => {
     if (rows.length >= 10) return;
@@ -44,9 +46,19 @@ export function useAdminTransactions() {
     setOk(false);
     setLoading(true);
     try {
-      const { data } = await eden.api.plaid.sandbox.createTransactions.post({
-        transactions: rows,
-      });
+      if (!isSignedIn) {
+        setError("Please sign in");
+        return;
+      }
+      const token = await getToken();
+      if (!token) {
+        setError("Missing auth token");
+        return;
+      }
+      const { data } = await eden.api.plaid.sandbox.createTransactions.post(
+        { transactions: rows },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (!data?.ok) {
         setError(data?.error || "Failed to create transactions");
         return;

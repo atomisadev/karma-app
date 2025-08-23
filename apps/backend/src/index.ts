@@ -1,5 +1,14 @@
-import { app } from "./server";
+import { app as baseApp } from "./app";
 
-app.listen(3001);
+import { plaidRoutes } from "./routes/plaid.route";
 
-console.log(`🦊 ElysiaJS server running at http://localhost:3001`);
+const app = baseApp
+  .get("/", () => ({ message: "Hello from Elysia!" }))
+  .use(plaidRoutes)
+  .listen(3001);
+
+console.log(
+  `Elysia is running at http://${app.server?.hostname}:${app.server?.port}`
+);
+
+export type App = typeof app;
