@@ -2,9 +2,11 @@ import { Elysia } from "elysia";
 import {
   createLinkToken,
   exchangePublicToken,
+  getAccounts,
   getTransactions,
   getUserPlaidStatus,
   sandboxCreateTransactions,
+  sandboxFireTransactionsWebhook,
 } from "../services/plaid.service";
 import {
   ExchangePublicTokenSchema,
@@ -83,4 +85,16 @@ export const plaidRoutes = (app: App) =>
         const result = await getAccounts({ userId });
         return result;
       })
+      .post(
+        "/sandbox/fireTransactionsWebhook",
+        async ({ set, requireAuth }) => {
+          const userId = requireAuth();
+          const res = await sandboxFireTransactionsWebhook({ userId });
+          if ("error" in res) {
+            set.status = 400;
+            return { ok: false, error: res.error };
+          }
+          return { ok: res.ok };
+        }
+      )
   );

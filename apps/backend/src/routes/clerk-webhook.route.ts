@@ -12,7 +12,7 @@ import {
   type ClerkUserDeletedEvent,
 } from "@backend/schemas/user.schema";
 
-export const webhookRoutes = new Elysia({ prefix: "/webhook" }).post(
+export const clerkWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   "/clerk",
   async ({ body, headers, set }) => {
     try {
@@ -56,7 +56,6 @@ export const webhookRoutes = new Elysia({ prefix: "/webhook" }).post(
           await handleUserDeleted(clerkUserDeletedEventSchema.parse(event));
           break;
         default:
-          // Ignore other event types
           break;
       }
 

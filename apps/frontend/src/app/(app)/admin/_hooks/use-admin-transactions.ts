@@ -76,27 +76,27 @@ export function useAdminTransactions() {
   ) => {
     const presets = {
       coffee: {
-        amount: 4.5, // ✅ Positive for expense
+        amount: 4.5,
         description: "Coffee Shop",
         isoCurrencyCode: "USD",
       },
       grocery: {
-        amount: 75.3, // ✅ Positive for expense
+        amount: 75.3,
         description: "Grocery Store",
         isoCurrencyCode: "USD",
       },
       gas: {
-        amount: 45.0, // ✅ Positive for expense
+        amount: 45.0,
         description: "Gas Station",
         isoCurrencyCode: "USD",
       },
       restaurant: {
-        amount: 28.75, // ✅ Positive for expense
+        amount: 28.75,
         description: "Restaurant",
         isoCurrencyCode: "USD",
       },
       income: {
-        amount: -2500.0, // ✅ Negative for income (credit)
+        amount: -2500.0,
         description: "Salary Deposit",
         isoCurrencyCode: "USD",
       },

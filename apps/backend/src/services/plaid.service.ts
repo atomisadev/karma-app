@@ -4,6 +4,8 @@ import {
   PlaidApi,
   PlaidEnvironments,
   Products,
+  SandboxItemFireWebhookRequestWebhookCodeEnum,
+  WebhookType,
 } from "plaid";
 import { getDb } from "./mongo.service";
 import type { User } from "@backend/schemas/user.schema";
@@ -48,7 +50,6 @@ export async function exchangePublicToken({
     public_token: publicToken,
   });
 
-  // Store access token in MongoDB instead of memory
   const db = getDb();
   const usersCollection = db.collection<User>("users");
 
@@ -81,7 +82,6 @@ export async function getTransactions({
   console.log("startDate:", startDate);
   console.log("endDate:", endDate);
 
-  // Get access token from MongoDB
   const db = getDb();
   const usersCollection = db.collection<User>("users");
   const user = await usersCollection.findOne({ clerkId: userId });
@@ -107,10 +107,7 @@ export async function getTransactions({
   }
 
   console.log(`Fetching transactions from ${start} to ${end}`);
-  console.log(
-    "Access token (first 10 chars):",
-    user.plaidAccessToken.slice(0, 10) + "..."
-  );
+  console.log("Access token:", user.plaidAccessToken);
 
   try {
     const { data } = await plaid.transactionsGet({
@@ -120,17 +117,17 @@ export async function getTransactions({
       options: { count: 200, offset: 0 },
     });
 
-    console.log(`Found ${data.transactions.length} transactions`);
-    console.log(
-      "Transaction data:",
-      data.transactions.map((t) => ({
-        id: t.transaction_id,
-        amount: t.amount,
-        date: t.date,
-        name: t.name,
-        account_id: t.account_id,
-      }))
-    );
+    // console.log(`Found ${data.transactions.length} transactions`);
+    // console.log(
+    //   "Transaction data:",
+    //   data.transactions.map((t) => ({
+    //     id: t.transaction_id,
+    //     amount: t.amount,
+    //     date: t.date,
+    //     name: t.name,
+    //     account_id: t.account_id,
+    //   }))
+    // );
 
     return { transactions: data.transactions };
   } catch (error) {
@@ -152,7 +149,6 @@ export async function sandboxCreateTransactions({
     isoCurrencyCode?: string;
   }[];
 }) {
-  // Get access token from MongoDB
   const db = getDb();
   const usersCollection = db.collection<User>("users");
   const user = await usersCollection.findOne({ clerkId: userId });
@@ -176,7 +172,7 @@ export async function sandboxCreateTransactions({
       })),
     });
 
-    console.log("Sandbox transactions created successfully:", result);
+    // console.log("Sandbox transactions created successfully:", result);
     return { ok: true };
   } catch (error) {
     console.error("Error creating sandbox transactions:", error);
@@ -184,7 +180,6 @@ export async function sandboxCreateTransactions({
   }
 }
 
-// New function to check if user has connected Plaid account
 export async function getUserPlaidStatus({ userId }: { userId: string }) {
   const db = getDb();
   const usersCollection = db.collection<User>("users");
@@ -197,7 +192,6 @@ export async function getUserPlaidStatus({ userId }: { userId: string }) {
   };
 }
 
-// Add this new function to check accounts
 export async function getAccounts({ userId }: { userId: string }) {
   const db = getDb();
   const usersCollection = db.collection<User>("users");
@@ -213,19 +207,42 @@ export async function getAccounts({ userId }: { userId: string }) {
     });
 
     console.log("Accounts found:", data.accounts.length);
-    console.log(
-      "Account details:",
-      data.accounts.map((acc) => ({
-        id: acc.account_id,
-        name: acc.name,
-        type: acc.type,
-        subtype: acc.subtype,
-      }))
-    );
+    // console.log(
+    //   "Account details:",
+    //   data.accounts.map((acc) => ({
+    //     id: acc.account_id,
+    //     name: acc.name,
+    //     type: acc.type,
+    //     subtype: acc.subtype,
+    //   }))
+    // );
 
     return { accounts: data.accounts };
   } catch (error) {
     console.error("Error fetching accounts:", error);
     throw error;
   }
+}
+
+export async function sandboxFireTransactionsWebhook({
+  userId,
+}: {
+  userId: string;
+}) {
+  const db = getDb();
+  const usersCollection = db.collection<User>("users");
+  const user = await usersCollection.findOne({ clerkId: userId });
+
+  if (!user?.plaidAccessToken) {
+    return { error: "No accessToken. Link account first." as const };
+  }
+
+  const { data } = await plaid.sandboxItemFireWebhook({
+    access_token: user.plaidAccessToken,
+    webhook_type: WebhookType.Transactions,
+    webhook_code:
+      SandboxItemFireWebhookRequestWebhookCodeEnum.SyncUpdatesAvailable,
+  });
+
+  return { ok: data.webhook_fired === true };
 }

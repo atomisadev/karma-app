@@ -3,8 +3,9 @@ import { cors } from "@elysiajs/cors";
 import { clerkPlugin } from "elysia-clerk";
 import type { ElysiaErrors } from "elysia/error";
 import { plaidRoutes } from "./routes/plaid.route";
-import { webhookRoutes } from "./routes/webhook.route";
+import { clerkWebhookRoutes } from "./routes/clerk-webhook.route";
 import { env } from "./config";
+import { plaidWebhookRoutes } from "./routes/plaid-webhook.route";
 
 export const app = new Elysia()
   .use(
@@ -26,7 +27,8 @@ export const app = new Elysia()
     })
   )
   .use(clerkPlugin())
-  .use(webhookRoutes)
+  .use(clerkWebhookRoutes)
+  .use(plaidWebhookRoutes)
   .derive((ctx) => ({
     requireAuth: () => {
       const { userId } = ctx.auth();
