@@ -40,7 +40,6 @@ export function TransactionsForm({
         </div>
       </div>
 
-      {/* Preset Transaction Buttons */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-gray-700">
           Quick Add Presets:

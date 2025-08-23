@@ -29,6 +29,7 @@ export default function OnboardingPage() {
   const { me, loading, completeOnboarding } = useUserProfile();
 
   const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [showIncomeModal, setShowIncomeModal] = useState(true);
 
   useEffect(() => {
     if (me?.onboardingCompleted) {
@@ -62,10 +63,7 @@ export default function OnboardingPage() {
       (t) => t.status === "cleared" && t.date >= last30Days
     );
     const incomes = clearedRecent.filter(
-      (t) =>
-        t.amount < 0 ||
-        t.category?.includes("Payroll") ||
-        t.category?.includes("Deposit")
+      (t) => t.name === "Monthly Salary Deposit"
     );
     return incomes.reduce((sum, t) => sum + Math.abs(t.amount), 0);
   }, [txs, last30Days]);
@@ -104,14 +102,31 @@ export default function OnboardingPage() {
 
   if (!isSignedIn) return null;
 
-  return (
-    <div className="font-sans min-h-screen p-8 max-w-3xl mx-auto flex flex-col gap-8">
-      <div className="rounded-xl border p-6 flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold">Welcome!</h1>
-        {checkingStatus || transactionsLoading ? (
-          <p>Loading your data…</p>
-        ) : !isConnected ? (
-          <div className="flex items-center gap-3">
+  const isLoading = checkingStatus || transactionsLoading || loading;
+
+  if (isLoading) {
+    return (
+      <div className="font-sans min-h-screen p-8 max-w-3xl mx-auto flex flex-col gap-8 items-center justify-center">
+        <div className="rounded-xl border p-6 flex flex-col gap-4 text-center">
+          <h1 className="text-2xl font-semibold">Loading your data...</h1>
+          <p className="text-gray-600">
+            Please wait while we fetch your transactions.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="font-sans min-h-screen p-8 max-w-3xl mx-auto flex flex-col gap-8 items-center justify-center">
+        <div className="rounded-xl border p-6 flex flex-col gap-4 text-center">
+          <h1 className="text-2xl font-semibold mb-2">Welcome!</h1>
+          <p className="text-gray-600">
+            Connect your bank account to start your financial journey with
+            Karma.
+          </p>
+          <div className="flex justify-center items-center mt-4">
             <button
               disabled={!ready}
               onClick={() => open()}
@@ -119,72 +134,100 @@ export default function OnboardingPage() {
             >
               Connect your bank
             </button>
-            <p className="text-sm text-gray-600">
-              Connect to pull your transactions, then we’ll show your summary.
-            </p>
           </div>
-        ) : (
-          <>
-            <p className="text-lg">
-              You make <span className="font-bold">${income30.toFixed(2)}</span>{" "}
-              over the last 30 days.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="font-sans min-h-screen flex items-center justify-center p-8 bg-gray-50">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={() => {}}
+      >
+        {showIncomeModal && (
+          <div
+            className="relative rounded-xl border bg-white p-8 w-full max-w-sm flex flex-col gap-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h1 className="text-2xl font-semibold">Your Monthly Income</h1>
+            <p className="text-4xl font-bold">
+              {new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+              }).format(income30)}
+            </p>
+            <p className="text-sm text-gray-600">
+              This is the estimated total income from your transactions over the
+              last 30 days.
             </p>
             <button
-              onClick={handleComplete}
-              disabled={saving}
-              className="self-start px-4 py-2 bg-black text-white rounded"
+              onClick={() => setShowIncomeModal(false)}
+              className="px-4 py-2 bg-black text-white rounded-md mt-4"
             >
-              {saving ? "Saving…" : "I understand"}
+              Yes, I understand
             </button>
-          </>
+          </div>
         )}
-      </div>
 
-      {Object.keys(categoryTotals).length > 0 && (
-        <div className="rounded-xl border p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Your spending by category
-          </h2>
-          <div className="grid grid-cols-1 gap-3">
-            {Object.entries(categoryTotals).map(([cat, total]) => (
-              <div
-                key={cat}
-                className="flex items-center justify-between gap-3 border rounded p-3"
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{cat}</div>
-                  <div className="text-sm text-gray-600">
-                    Last 30 days: ${total.toFixed(2)}
+        {!showIncomeModal && Object.keys(categoryTotals).length > 0 && (
+          <div
+            className="relative rounded-xl border bg-white p-8 w-full max-w-xl flex flex-col gap-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold mb-4">
+              Set your budgets based on spending
+            </h2>
+            <p className="text-sm text-gray-600">
+              We’ve detected your spending categories from the last 30 days. You
+              can set a monthly budget for each, or leave them as the default.
+            </p>
+            <div className="grid grid-cols-1 gap-3 max-h-[50vh] overflow-y-auto pr-2">
+              {Object.entries(categoryTotals).map(([cat, total]) => (
+                <div
+                  key={cat}
+                  className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 border rounded-md p-3"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-lg">{cat}</div>
+                    <div className="text-sm text-gray-600">
+                      Last 30 days:{" "}
+                      <span className="font-bold">
+                        {new Intl.NumberFormat("en-US", {
+                          style: "currency",
+                          currency: "USD",
+                        }).format(total)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700">Budget</label>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-28"
+                      value={mergedBudgets[cat] ?? 0}
+                      onChange={(e) =>
+                        setBudgets((prev) => ({
+                          ...prev,
+                          [cat]: Number(e.target.value || 0),
+                        }))
+                      }
+                    />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-700">Budget</label>
-                  <input
-                    type="number"
-                    className="border rounded px-2 py-1 w-32"
-                    value={mergedBudgets[cat] ?? 0}
-                    onChange={(e) =>
-                      setBudgets((prev) => ({
-                        ...prev,
-                        [cat]: Number(e.target.value || 0),
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex gap-3">
+              ))}
+            </div>
             <button
               disabled={saving}
               onClick={handleComplete}
-              className="px-4 py-2 bg-black text-white rounded"
+              className="px-4 py-2 bg-black text-white rounded-md mt-4"
             >
               {saving ? "Saving…" : "Save budgets and finish"}
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

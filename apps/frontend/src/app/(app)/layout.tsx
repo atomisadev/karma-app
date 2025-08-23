@@ -17,9 +17,9 @@ export default async function AppLayout({
       headers: { Authorization: `Bearer ${token}` },
     });
     const me = res.data as any;
-    // if (me && me.onboardingCompleted === false) {
-    //   redirect("/onboarding");
-    // }
+    if (me && me.onboardingCompleted === false) {
+      redirect("/onboarding");
+    }
   }
 
   return children;

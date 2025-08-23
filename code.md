@@ -70,6 +70,7 @@ apps
     │   │   └── onboarding
     │   │       └── page.tsx
     │   ├── components
+    │   │   ├── Score.tsx
     │   │   ├── providers.tsx
     │   │   └── ui
     │   │       └── skeleton.tsx
@@ -647,8 +648,7 @@ import {
   type User,
   type ClerkUserEvent,
   type ClerkUserDeletedEvent,
-} from "@backend/schemas/user.schema";
-import { seedRandomTransactionsIfNone } from "@backend/services/transaction.service";
+} from "../schemas/user.schema";
 
 export const clerkWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   "/clerk",
@@ -747,17 +747,6 @@ const handleUserCreated = async (event: ClerkUserEvent) => {
 
     const result = await usersCollection.insertOne(validatedUser);
     console.log("User created successfully:", result.insertedId);
-
-    // Automatically seed random transactions for new users
-    try {
-      const seedResult = await seedRandomTransactionsIfNone(data.id);
-      console.log(
-        `Seeded ${seedResult.seeded} transactions for new user ${data.id}`
-      );
-    } catch (seedError) {
-      console.error("Error seeding transactions for new user:", seedError);
-      // Don't throw - user creation should succeed even if seeding fails
-    }
   } catch (error) {
     console.error("Error handling user creation:", error);
     throw error;
@@ -1393,10 +1382,10 @@ import {
   type Transaction as PlaidTransaction,
 } from "plaid";
 import { getDb } from "./mongo.service";
-import type { User } from "@backend/schemas/user.schema";
+import { type User } from "../schemas/user.schema";
 import type { Transaction } from "@backend/schemas/transaction.schema";
 import { env } from "@backend/config";
-import { seedRandomTransactionsIfNone } from "./transaction.service";
+import { replaceWithSeedTransactions } from "./transaction.service";
 
 const daysAgo = (days: number): string => {
   const date = new Date();
@@ -1456,8 +1445,7 @@ export async function exchangePublicToken({
   const db = getDb();
   const usersCollection = db.collection<User>("users");
 
-  await seedRandomTransactionsIfNone(userId);
-  console.log(`Seeded random transactions for user ${userId}.`);
+  await replaceWithSeedTransactions(userId);
 
   await usersCollection.updateOne(
     { clerkId: userId },
@@ -1531,7 +1519,7 @@ export async function getUserPlaidStatus({ userId }: { userId: string }) {
   const user = await usersCollection.findOne({ clerkId: userId });
 
   return {
-    isConnected: !!user?.plaidAccessToken || !!user?.seededTransactionsAt,
+    isConnected: !!user?.plaidAccessToken,
     connectedAt: user?.plaidConnectedAt ?? user?.seededTransactionsAt,
     itemId: user?.plaidItemId,
   };
@@ -1724,6 +1712,16 @@ const buildRandomTransaction = (
   };
 };
 
+const getFirstDaysOfMonths = (months: number): string[] => {
+  const dates = new Set<string>();
+  const now = new Date();
+  for (let i = 0; i < months; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    dates.add(date.toISOString().slice(0, 10));
+  }
+  return Array.from(dates).sort();
+};
+
 export const generateRandomTransactionsForUser = async (
   clerkId: string,
   count?: number
@@ -1732,44 +1730,32 @@ export const generateRandomTransactionsForUser = async (
   const n = count ?? randomInt(90, 100);
 
   const transactions: Omit<Transaction, "_id">[] = [];
+
   for (let i = 0; i < n; i++) {
     const m = merchants[randomInt(0, merchants.length - 1)];
     transactions.push(buildRandomTransaction(clerkId, m));
+  } 
+
+  const incomeDates = getFirstDaysOfMonths(4); 
+  const monthlySalary = randomFloat2(5000, 10000); 
+
+  for (const date of incomeDates) {
+    const incomeTransaction: Omit<Transaction, "_id"> = {
+      clerkId,
+      plaidTransactionId: `seed-income-${date}-${clerkId}`,
+      plaidAccountId: "account-checking-01",
+      amount: -monthlySalary, 
+      date,
+      name: "Monthly Salary Deposit",
+      paymentChannel: "direct deposit",
+      category: ["Financial", "Income"],
+      isoCurrencyCode: "USD",
+      status: "cleared",
+    };
+    transactions.push(incomeTransaction);
   }
+
   return transactions;
-};
-
-export const seedRandomTransactionsIfNone = async (clerkId: string) => {
-  const db = await getDb();
-  const transactionsCol = db.collection<Transaction>("transactions");
-  const usersCol = db.collection<User>("users");
-
-  const existingCount = await transactionsCol.countDocuments({ clerkId });
-  if (existingCount > 0) {
-    return {
-      ok: true as const,
-      seeded: 0,
-      message: "User already has transactions",
-    };
-  }
-
-  const docs = await generateRandomTransactionsForUser(clerkId);
-  if (docs.length === 0) {
-    return {
-      ok: true as const,
-      seeded: 0,
-      message: "No transactions generated",
-    };
-  }
-
-  await transactionsCol.insertMany(docs as any[]);
-  await usersCol.updateOne(
-    { clerkId },
-    { $set: { seededTransactionsAt: new Date(), updatedAt: new Date() } }
-  );
-
-  console.log(`Seeded ${docs.length} random transactions for user ${clerkId}.`);
-  return { ok: true as const, seeded: docs.length };
 };
 
 export const replaceWithSeedTransactions = async (
@@ -1780,7 +1766,6 @@ export const replaceWithSeedTransactions = async (
   const transactionsCol = db.collection<Transaction>("transactions");
   const usersCol = db.collection<User>("users");
 
-  // Remove everything, then seed fresh
   await transactionsCol.deleteMany({ clerkId });
 
   const docs = await generateRandomTransactionsForUser(clerkId, count);
@@ -1797,84 +1782,6 @@ export const replaceWithSeedTransactions = async (
     `Replaced transactions with ${docs.length} seeded transactions for user ${clerkId}.`
   );
   return { ok: true as const, seeded: docs.length };
-};
-
-// Existing helper for small fixed set seeding (kept for reference)
-export const seedInitialTransactions = async (clerkId: string) => {
-  try {
-    const db = await getDb();
-    const transactionsCollection = db.collection<Transaction>("transactions");
-
-    const transactions: Omit<Transaction, "_id">[] = [
-      {
-        clerkId,
-        plaidTransactionId: `tx-${new ObjectId()}`,
-        plaidAccountId: "account-checking-01",
-        amount: 12.75,
-        date: daysAgo(1),
-        name: "Uber Eats",
-        paymentChannel: "online",
-        category: ["Food and Drink", "Restaurants", "Delivery"],
-        isoCurrencyCode: "USD",
-        status: "pending",
-      },
-      {
-        clerkId,
-        plaidTransactionId: `tx-${new ObjectId()}`,
-        plaidAccountId: "account-checking-01",
-        amount: 7.21,
-        date: daysAgo(2),
-        name: "Starbucks",
-        paymentChannel: "in store",
-        category: ["Food and Drink", "Restaurants", "Coffee Shop"],
-        isoCurrencyCode: "USD",
-        status: "cleared",
-      },
-      {
-        clerkId,
-        plaidTransactionId: `tx-${new ObjectId()}`,
-        plaidAccountId: "account-checking-01",
-        amount: 89.5,
-        date: daysAgo(3),
-        name: "Amazon.com*Purchase",
-        paymentChannel: "online",
-        category: ["Shops", "Digital Purchase"],
-        isoCurrencyCode: "USD",
-        status: "cleared",
-      },
-      {
-        clerkId,
-        plaidTransactionId: `tx-${new ObjectId()}`,
-        plaidAccountId: "account-checking-01",
-        amount: -3200.0,
-        date: daysAgo(8),
-        name: "PAYROLL DEPOSIT - ACME INC",
-        paymentChannel: "other",
-        category: ["Transfer", "Deposit", "Payroll"],
-        isoCurrencyCode: "USD",
-        status: "cleared",
-      },
-      {
-        clerkId,
-        plaidTransactionId: `tx-${new ObjectId()}`,
-        plaidAccountId: "account-checking-01",
-        amount: 1850.0,
-        date: daysAgo(22),
-        name: "Zelle Transfer to Landlord",
-        paymentChannel: "online",
-        category: ["Transfer", "Payment", "Rent"],
-        isoCurrencyCode: "USD",
-        status: "cleared",
-      },
-    ];
-
-    await transactionsCollection.insertMany(transactions as any[]);
-    console.log(
-      `Seeded ${transactions.length} initial transactions for user ${clerkId}.`
-    );
-  } catch (error) {
-    console.error(`Failed to seed transactions for user ${clerkId}:`, error);
-  }
 };
 
 ```
@@ -2760,6 +2667,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { eden } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import Score from "../../components/Score";
 
 export default function Home() {
   const {
@@ -2800,7 +2708,14 @@ export default function Home() {
   }
 
   return (
-    <div className="font-sans min-h-screen p-8 flex flex-col items-center gap-8">
+    <div className="flex flex-row justify-evenly w-full font-sans">
+      <div className="flex flex-col items-center my-40">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Karma Score</h2>
+          <Score score={500} size={400}/>
+        </div>
+      </div>
+    <div className=" min-h-screen p-8 flex flex-col items-center gap-8">
       <h1 className="text-2xl font-semibold">
         {isConnected
           ? "Your Transactions"
@@ -2903,6 +2818,7 @@ export default function Home() {
           </ul>
         </div>
       )}
+    </div>
     </div>
   );
 }
@@ -3299,6 +3215,155 @@ export default function OnboardingPage() {
 
 ```
 
+`apps/frontend/src/components/Score.tsx`:
+
+```tsx
+"use client";
+
+import { useMemo, useState } from "react";
+
+// Simple half-arc gauge (300–850). No needle; just a thick semi-circle with a gradient
+// and a circular knob at the current value (like your reference image).
+export type ScoreProps = {
+  score?: number; // 300–850
+  size?: number; // overall width in px
+};
+
+const MIN_SCORE = 300;
+const MAX_SCORE = 850;
+const SWEEP_DEG = 180; // half-arc
+const START_ANGLE = -180; // left
+const END_ANGLE = 0; // right
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+const scoreToRatio = (score: number) => {
+  const t = (score - MIN_SCORE) / (MAX_SCORE - MIN_SCORE);
+  return clamp(t, 0, 1);
+};
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end = polarToCartesian(cx, cy, r, endAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+}
+
+export default function Score({
+  score = 575,
+  size = 460,
+}: ScoreProps) {
+  const s = clamp(score, MIN_SCORE, MAX_SCORE);
+
+  const ratio = scoreToRatio(s);
+  const angle = START_ANGLE + ratio * SWEEP_DEG;
+
+  // Geometry sized to perfectly fit a semicircle inside the svg without overflow
+  const thickness = 26;
+  const w = size; // total width
+  const r = (w - thickness) / 3; // radius so stroke stays inside width
+  const cx = w / 2;
+  const cy = r + thickness / 2; // center sits at the bottom of the half-arc
+  const h = r + thickness; // svg height needed to contain the arc + stroke
+
+  // Paths
+  const trackPath = useMemo(() => arcPath(cx, cy, r, START_ANGLE, END_ANGLE), [cx, cy, r]);
+  const progressPath = useMemo(() => arcPath(cx, cy, r, START_ANGLE, angle), [cx, cy, r, angle]);
+
+  // Knob position at the current angle
+  const knob = polarToCartesian(cx, cy, r, angle);
+  const knobR = Math.max(10, thickness * 0.6);
+
+  return (
+    <div className="w-full flex flex-col items-center gap-6 p-6">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
+        {/* Background track */}
+        <path
+          d={trackPath}
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth={thickness}
+          strokeLinecap="round"
+        />
+
+        {/* Progress arc */}
+        <path
+          d={progressPath}
+          fill="none"
+          stroke="url(#progressGradient)"
+          strokeWidth={thickness}
+          strokeLinecap="round"
+        />
+
+        {/* Knob at end of progress */}
+        <g>
+          <circle
+            cx={knob.x}
+            cy={knob.y}
+            r={knobR}
+            fill="#ffffff"
+            style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,.25))" }}
+          />
+          <circle
+            cx={knob.x}
+            cy={knob.y}
+            r={knobR - 6}
+            fill="#ffffff"
+            stroke="#e5e7eb"
+            strokeWidth={4}
+          />
+        </g>
+
+        {/* Score text inside arc */}
+        <text
+          x={cx}
+          y={cy - r / 4} // lower down compared to before
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={48}
+          fontWeight="600"
+          fill="#111827"
+        >
+          {s}
+        </text>
+        <text
+          x={cx}
+          y={cy - r / 4 + 32} // label just below score
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={14}
+          fill="#6b7280"
+        >
+          {MIN_SCORE}–{MAX_SCORE}
+        </text>
+
+        {/* Gradient left (300/red) → right (850/green) */}
+        <defs>
+          <linearGradient
+            id="progressGradient"
+            gradientUnits="userSpaceOnUse"
+            x1={cx - r}
+            y1={cy}
+            x2={cx + r}
+            y2={cy}
+          >
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="50%" stopColor="#eab308" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  );
+}
+
+```
+
 `apps/frontend/src/components/providers.tsx`:
 
 ```tsx
@@ -3377,10 +3442,15 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 
-export default clerkMiddleware((auth, req) => {
-  if (isPublicRoute(req)) return;
-  auth.protect();
-});
+export default clerkMiddleware(
+  (auth, req) => {
+    if (isPublicRoute(req)) return;
+    auth.protect();
+  },
+  {
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  }
+);
 
 export const config = {
   matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/"],

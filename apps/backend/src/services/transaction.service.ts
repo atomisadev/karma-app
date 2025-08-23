@@ -10,6 +10,12 @@ type Merchant = {
   amountRange: [number, number];
 };
 
+const randomDateInMonth = (year: number, month: number): string => {
+  const day = randomInt(1, 28);
+  const date = new Date(year, month, day);
+  return date.toISOString().slice(0, 10);
+};
+
 const daysAgo = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -36,10 +42,11 @@ const randomPaymentChannel = () => {
   return channels[randomInt(0, channels.length - 1)];
 };
 
-const buildRandomTransaction = (
+const buildExpenseTransaction = (
   clerkId: string,
-  m: Merchant
-): Omit<Transaction, "_id"> => {
+  m: Merchant,
+  date: string
+): Omit<Transaction, "_id"> & { baseAmount: number } => {
   const [min, max] = m.amountRange;
   const baseAmount = randomFloat2(min, max);
 
@@ -55,11 +62,11 @@ const buildRandomTransaction = (
 
   const amount = isIncoming ? -baseAmount : baseAmount;
 
-  const daysBack = randomInt(0, 119);
-  const date = daysAgo(daysBack);
-
-  const isRecent = daysBack <= 2;
-  const status = isRecent && Math.random() < 0.5 ? "pending" : "cleared";
+  const status =
+    new Date(date) > new Date(new Date().setDate(new Date().getDate() - 3)) &&
+    Math.random() < 0.5
+      ? "pending"
+      : "cleared";
 
   return {
     clerkId,
@@ -72,22 +79,88 @@ const buildRandomTransaction = (
     category: m.category,
     isoCurrencyCode: "USD",
     status,
+    baseAmount,
   };
 };
 
+const getStartOfLastNMonths = (months: number): Date[] => {
+  const dates: Date[] = [];
+  const now = new Date();
+  now.setDate(1);
+  for (let i = 0; i < months; i++) {
+    dates.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+  }
+  return dates.sort((a, b) => a.getTime() - b.getTime());
+};
+
+const getFirstDaysOfMonths = (months: number): string[] => {
+  const dates = new Set<string>();
+  const now = new Date();
+  for (let i = 0; i < months; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    dates.add(date.toISOString().slice(0, 10));
+  }
+  return Array.from(dates).sort();
+};
 export const generateRandomTransactionsForUser = async (
   clerkId: string,
   count?: number
 ): Promise<Omit<Transaction, "_id">[]> => {
   const merchants = await loadMerchants();
-  const n = count ?? randomInt(90, 100);
+  const allTransactions: Omit<Transaction, "_id">[] = [];
 
-  const transactions: Omit<Transaction, "_id">[] = [];
-  for (let i = 0; i < n; i++) {
-    const m = merchants[randomInt(0, merchants.length - 1)];
-    transactions.push(buildRandomTransaction(clerkId, m));
+  const monthlySalary = randomFloat2(5000, 10000);
+  const monthStarts = getStartOfLastNMonths(4);
+
+  for (const startDate of monthStarts) {
+    const year = startDate.getFullYear();
+    const month = startDate.getMonth();
+
+    const incomeTransaction: Omit<Transaction, "_id"> = {
+      clerkId,
+      plaidTransactionId: `seed-income-${year}-${month + 1}-${clerkId}`,
+      plaidAccountId: "account-checking-01",
+      amount: -monthlySalary,
+      date: startDate.toISOString().slice(0, 10),
+      name: "Monthly Salary Deposit",
+      paymentChannel: "direct deposit",
+      category: ["Financial", "Income"],
+      isoCurrencyCode: "USD",
+      status: "cleared",
+    };
+    allTransactions.push(incomeTransaction);
+
+    const monthlySpendingTarget = monthlySalary * randomFloat2(0.7, 0.95);
+    let currentMonthSpending = 0;
+    let attempts = 0;
+
+    while (currentMonthSpending < monthlySpendingTarget && attempts < 200) {
+      const m = merchants[randomInt(0, merchants.length - 1)];
+
+      if (
+        m.name.includes("Rent") &&
+        monthlySpendingTarget - currentMonthSpending < 1500
+      ) {
+        attempts++;
+        continue;
+      }
+
+      const date = randomDateInMonth(year, month);
+      const expenseTx = buildExpenseTransaction(clerkId, m, date);
+
+      if (
+        currentMonthSpending + expenseTx.baseAmount <=
+        monthlySpendingTarget
+      ) {
+        currentMonthSpending += expenseTx.baseAmount;
+        const { baseAmount, ...finalTx } = expenseTx;
+        allTransactions.push(finalTx);
+      }
+      attempts++;
+    }
   }
-  return transactions;
+
+  return allTransactions;
 };
 
 export const replaceWithSeedTransactions = async (
@@ -98,7 +171,6 @@ export const replaceWithSeedTransactions = async (
   const transactionsCol = db.collection<Transaction>("transactions");
   const usersCol = db.collection<User>("users");
 
-  // Remove everything, then seed fresh
   await transactionsCol.deleteMany({ clerkId });
 
   const docs = await generateRandomTransactionsForUser(clerkId, count);
