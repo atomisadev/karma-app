@@ -6,9 +6,11 @@ import {
   Products,
   SandboxItemFireWebhookRequestWebhookCodeEnum,
   WebhookType,
+  type Transaction as PlaidTransaction,
 } from "plaid";
 import { getDb } from "./mongo.service";
 import type { User } from "@backend/schemas/user.schema";
+import type { Transaction } from "@backend/schemas/transaction.schema";
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = process.env.PLAID_SECRET || "";
@@ -52,6 +54,42 @@ export async function exchangePublicToken({
 
   const db = getDb();
   const usersCollection = db.collection<User>("users");
+  const transactionsCollection = db.collection<Transaction>("transactions");
+
+  let cursor: string | undefined = undefined;
+  let added: PlaidTransaction[] = [];
+  let hasMore = true;
+
+  while (hasMore) {
+    const request = {
+      access_token: data.access_token,
+      cursor: cursor,
+    };
+    const response = await plaid.transactionsSync(request);
+    const newData = response.data;
+    added = added.concat(newData.added);
+    hasMore = newData.has_more;
+    cursor = newData.next_cursor;
+  }
+
+  if (added.length > 0) {
+    const initialTransactions = added.map((tx) => ({
+      clerkId: userId,
+      plaidTransactionId: tx.transaction_id,
+      plaidAccountId: tx.account_id,
+      amount: tx.amount,
+      date: tx.date,
+      name: tx.name,
+      paymentChannel: tx.payment_channel,
+      category: tx.category || undefined,
+      isoCurrencyCode: tx.iso_currency_code,
+      pending: tx.pending,
+    }));
+    await transactionsCollection.insertMany(initialTransactions as any);
+    console.log(
+      `Pulled ${added.length} initial transactions for user ${userId}.`
+    );
+  }
 
   await usersCollection.updateOne(
     { clerkId: userId },
@@ -60,6 +98,7 @@ export async function exchangePublicToken({
         plaidAccessToken: data.access_token,
         plaidItemId: data.item_id,
         plaidConnectedAt: new Date(),
+        plaidTransactionsCursor: cursor,
         updatedAt: new Date(),
       },
     }
@@ -78,106 +117,35 @@ export async function getTransactions({
   endDate?: string;
 }) {
   console.log("=== getTransactions called ===");
-  console.log("userId:", userId);
-  console.log("startDate:", startDate);
-  console.log("endDate:", endDate);
-
   const db = getDb();
-  const usersCollection = db.collection<User>("users");
-  const user = await usersCollection.findOne({ clerkId: userId });
+  const transactionsCollection = db.collection<Transaction>("transactions");
 
-  console.log("User found:", !!user);
-  console.log("User has plaidAccessToken:", !!user?.plaidAccessToken);
-
-  if (!user?.plaidAccessToken) {
-    return { error: "No accessToken. Link account first." as const };
+  const query: Record<string, any> = { clerkId: userId };
+  if (startDate) {
+    query.date = { ...query.date, $gte: startDate };
+  }
+  if (endDate) {
+    query.date = { ...query.date, $lte: endDate };
   }
 
-  let start = startDate;
-  let end = endDate;
+  const userTransactions = await transactionsCollection
+    .find(query)
+    .sort({ date: -1 })
+    .toArray();
 
-  if (!start || !end) {
-    const s = new Date();
-    s.setDate(s.getDate() - 30);
-    start = s.toISOString().slice(0, 10);
-
-    const e = new Date();
-    e.setDate(e.getDate() + 1);
-    end = e.toISOString().slice(0, 10);
-  }
-
-  console.log(`Fetching transactions from ${start} to ${end}`);
-  console.log("Access token:", user.plaidAccessToken);
-
-  try {
-    const { data } = await plaid.transactionsGet({
-      access_token: user.plaidAccessToken,
-      start_date: start!,
-      end_date: end!,
-      options: { count: 200, offset: 0 },
-    });
-
-    // console.log(`Found ${data.transactions.length} transactions`);
-    // console.log(
-    //   "Transaction data:",
-    //   data.transactions.map((t) => ({
-    //     id: t.transaction_id,
-    //     amount: t.amount,
-    //     date: t.date,
-    //     name: t.name,
-    //     account_id: t.account_id,
-    //   }))
-    // );
-
-    return { transactions: data.transactions };
-  } catch (error) {
-    console.error("Error fetching transactions:", error);
-    throw error;
-  }
-}
-
-export async function sandboxCreateTransactions({
-  userId,
-  transactions,
-}: {
-  userId: string;
-  transactions: {
-    amount: number;
-    datePosted: string;
-    dateTransacted: string;
-    description: string;
-    isoCurrencyCode?: string;
-  }[];
-}) {
-  const db = getDb();
-  const usersCollection = db.collection<User>("users");
-  const user = await usersCollection.findOne({ clerkId: userId });
-
-  if (!user?.plaidAccessToken) {
-    return { error: "No accessToken. Link account first." as const };
-  }
-
-  console.log("Creating sandbox transactions:", transactions);
-  console.log("User access token exists:", !!user.plaidAccessToken);
-
-  try {
-    const result = await plaid.sandboxTransactionsCreate({
-      access_token: user.plaidAccessToken,
-      transactions: transactions.map((t) => ({
-        amount: t.amount,
-        date_posted: t.datePosted,
-        date_transacted: t.dateTransacted,
-        description: t.description,
-        iso_currency_code: t.isoCurrencyCode,
-      })),
-    });
-
-    // console.log("Sandbox transactions created successfully:", result);
-    return { ok: true };
-  } catch (error) {
-    console.error("Error creating sandbox transactions:", error);
-    throw error;
-  }
+  return {
+    transactions: userTransactions.map((tx) => ({
+      transaction_id: tx.plaidTransactionId,
+      account_id: tx.plaidAccountId,
+      amount: tx.amount,
+      date: tx.date,
+      name: tx.name,
+      payment_channel: tx.paymentChannel,
+      category: tx.category,
+      iso_currency_code: tx.isoCurrencyCode,
+      pending: tx.pending,
+    })),
+  };
 }
 
 export async function getUserPlaidStatus({ userId }: { userId: string }) {

@@ -9,7 +9,6 @@ export function usePlaid() {
   const { getToken, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
 
-  // Query for Plaid status
   const {
     data: statusData,
     isLoading: checkingStatus,
@@ -30,7 +29,6 @@ export function usePlaid() {
 
   const isConnected = statusData?.isConnected || false;
 
-  // Query for link token (only when not connected)
   const { data: linkTokenData, isLoading: linkTokenLoading } = useQuery({
     queryKey: ["plaid", "linkToken"],
     queryFn: async () => {
@@ -45,7 +43,6 @@ export function usePlaid() {
     enabled: isSignedIn && !isConnected && !checkingStatus,
   });
 
-  // Query for transactions (only when connected)
   const {
     data: transactionsData,
     isLoading: transactionsLoading,
@@ -64,7 +61,6 @@ export function usePlaid() {
     enabled: isSignedIn && isConnected,
   });
 
-  // Mutation for exchanging public token
   const exchangeTokenMutation = useMutation({
     mutationFn: async (publicToken: string) => {
       const token = await getToken();
@@ -76,7 +72,6 @@ export function usePlaid() {
       );
     },
     onSuccess: () => {
-      // Invalidate and refetch status and transactions
       queryClient.invalidateQueries({ queryKey: ["plaid", "status"] });
       queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
     },
@@ -90,8 +85,9 @@ export function usePlaid() {
   );
 
   const refreshTransactions = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
     refetchTransactions();
-  }, [refetchTransactions]);
+  }, [refetchTransactions, queryClient]);
 
   return {
     linkToken: linkTokenData?.linkToken || null,

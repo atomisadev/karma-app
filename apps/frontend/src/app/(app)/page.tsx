@@ -69,39 +69,6 @@ export default function Home() {
             Refresh transactions
           </button>
         )}
-        {isConnected && (
-          <button
-            className="rounded-md bg-red-600 text-white px-4 py-2 text-sm"
-            onClick={async () => {
-              const token = await getToken();
-              if (!token) return;
-
-              // Check accounts first
-              const accounts = await eden.api.plaid.accounts.get({
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              console.log("Accounts:", accounts);
-
-              // Then check transactions with explicit date range
-              const today = new Date().toISOString().slice(0, 10);
-              const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                .toISOString()
-                .slice(0, 10);
-
-              const transactionsWithDates =
-                await eden.api.plaid.transactions.get({
-                  query: { startDate: "2023-01-01", endDate: futureDate },
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-              console.log(
-                "Transactions with wide date range:",
-                transactionsWithDates
-              );
-            }}
-          >
-            🐛 Debug Plaid
-          </button>
-        )}
       </div>
 
       {isConnected && !transactions?.length && !transactionsLoading && (

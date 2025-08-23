@@ -49,7 +49,6 @@ export function useAdminTransactions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
-      queryClient.refetchQueries({ queryKey: ["plaid", "transactions"] });
       setRows([newRow()]);
     },
   });

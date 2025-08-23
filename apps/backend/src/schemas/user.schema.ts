@@ -9,6 +9,7 @@ export const userSchema = z.object({
   plaidAccessToken: z.string().optional(),
   plaidItemId: z.string().optional(),
   plaidConnectedAt: z.date().optional(),
+  plaidTransactionsCursor: z.string().optional(),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
 });
