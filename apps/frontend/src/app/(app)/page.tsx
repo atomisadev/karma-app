@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { eden } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import Score from "../../components/Score";
 
 export default function Home() {
   const {
@@ -47,7 +48,14 @@ export default function Home() {
   }
 
   return (
-    <div className="font-sans min-h-screen p-8 flex flex-col items-center gap-8">
+    <div className="flex flex-row justify-evenly w-full font-sans">
+      <div className="flex flex-col items-center my-40">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Karma Score</h2>
+          <Score score={500} size={400}/>
+        </div>
+      </div>
+    <div className=" min-h-screen p-8 flex flex-col items-center gap-8">
       <h1 className="text-2xl font-semibold">
         {isConnected
           ? "Your Transactions"
@@ -150,6 +158,7 @@ export default function Home() {
           </ul>
         </div>
       )}
+    </div>
     </div>
   );
 }
