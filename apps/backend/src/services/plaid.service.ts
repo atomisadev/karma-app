@@ -9,10 +9,10 @@ import {
   type Transaction as PlaidTransaction,
 } from "plaid";
 import { getDb } from "./mongo.service";
-import type { User } from "@backend/schemas/user.schema";
+import { type User } from "../schemas/user.schema";
 import type { Transaction } from "@backend/schemas/transaction.schema";
 import { env } from "@backend/config";
-import { seedRandomTransactionsIfNone } from "./transaction.service";
+import { replaceWithSeedTransactions } from "./transaction.service";
 
 const daysAgo = (days: number): string => {
   const date = new Date();
@@ -72,8 +72,7 @@ export async function exchangePublicToken({
   const db = getDb();
   const usersCollection = db.collection<User>("users");
 
-  await seedRandomTransactionsIfNone(userId);
-  console.log(`Seeded random transactions for user ${userId}.`);
+  await replaceWithSeedTransactions(userId);
 
   await usersCollection.updateOne(
     { clerkId: userId },
@@ -147,7 +146,7 @@ export async function getUserPlaidStatus({ userId }: { userId: string }) {
   const user = await usersCollection.findOne({ clerkId: userId });
 
   return {
-    isConnected: !!user?.plaidAccessToken || !!user?.seededTransactionsAt,
+    isConnected: !!user?.plaidAccessToken,
     connectedAt: user?.plaidConnectedAt ?? user?.seededTransactionsAt,
     itemId: user?.plaidItemId,
   };

@@ -11,13 +11,16 @@ apps
 │   │   ├── app.ts
 │   │   ├── config
 │   │   │   └── index.ts
+│   │   ├── data
+│   │   │   └── merchants.json
 │   │   ├── index.ts
 │   │   ├── plugin
 │   │   │   └── clerk.ts
 │   │   ├── routes
 │   │   │   ├── clerk-webhook.route.ts
 │   │   │   ├── plaid-webhook.route.ts
-│   │   │   └── plaid.route.ts
+│   │   │   ├── plaid.route.ts
+│   │   │   └── user.route.ts
 │   │   ├── schemas
 │   │   │   ├── plaid.schema.ts
 │   │   │   ├── transaction.schema.ts
@@ -44,7 +47,8 @@ apps
     │   ├── app
     │   │   ├── (app)
     │   │   │   ├── _hooks
-    │   │   │   │   └── use-plaid.ts
+    │   │   │   │   ├── use-plaid.ts
+    │   │   │   │   └── use-user.ts
     │   │   │   ├── admin
     │   │   │   │   ├── _components
     │   │   │   │   │   └── transactions-form.tsx
@@ -62,7 +66,9 @@ apps
     │   │   │           └── page.tsx
     │   │   ├── favicon.ico
     │   │   ├── globals.css
-    │   │   └── layout.tsx
+    │   │   ├── layout.tsx
+    │   │   └── onboarding
+    │   │       └── page.tsx
     │   ├── components
     │   │   ├── providers.tsx
     │   │   └── ui
@@ -217,6 +223,373 @@ export const env = envSchema.parse({
 
 ```
 
+`apps/backend/src/data/merchants.json`:
+
+```json
+[
+  {
+    "name": "Starbucks",
+    "category": ["Food and Drink", "Coffee Shop"],
+    "amountRange": [4, 25]
+  },
+  {
+    "name": "Dunkin'",
+    "category": ["Food and Drink", "Coffee Shop"],
+    "amountRange": [3, 20]
+  },
+  {
+    "name": "McDonald's",
+    "category": ["Food and Drink", "Fast Food"],
+    "amountRange": [5, 30]
+  },
+  {
+    "name": "Subway",
+    "category": ["Food and Drink", "Fast Food"],
+    "amountRange": [8, 25]
+  },
+  {
+    "name": "Chipotle Mexican Grill",
+    "category": ["Food and Drink", "Restaurants"],
+    "amountRange": [10, 40]
+  },
+  {
+    "name": "The Cheesecake Factory",
+    "category": ["Food and Drink", "Restaurants"],
+    "amountRange": [40, 200]
+  },
+  {
+    "name": "Olive Garden",
+    "category": ["Food and Drink", "Restaurants"],
+    "amountRange": [30, 150]
+  },
+  {
+    "name": "Uber Eats",
+    "category": ["Food and Drink", "Delivery"],
+    "amountRange": [15, 100]
+  },
+  {
+    "name": "DoorDash",
+    "category": ["Food and Drink", "Delivery"],
+    "amountRange": [15, 100]
+  },
+  {
+    "name": "Grubhub",
+    "category": ["Food and Drink", "Delivery"],
+    "amountRange": [15, 100]
+  },
+  {
+    "name": "Local Pub",
+    "category": ["Food and Drink", "Bar"],
+    "amountRange": [20, 120]
+  },
+  {
+    "name": "Whole Foods Market",
+    "category": ["Groceries"],
+    "amountRange": [20, 300]
+  },
+  {
+    "name": "Trader Joe's",
+    "category": ["Groceries"],
+    "amountRange": [20, 250]
+  },
+  { "name": "Kroger", "category": ["Groceries"], "amountRange": [15, 350] },
+  { "name": "Safeway", "category": ["Groceries"], "amountRange": [15, 300] },
+  {
+    "name": "Costco",
+    "category": ["Groceries", "Shops"],
+    "amountRange": [50, 700]
+  },
+  { "name": "H-E-B", "category": ["Groceries"], "amountRange": [20, 400] },
+  {
+    "name": "Amazon.com*Purchase",
+    "category": ["Shops", "Online"],
+    "amountRange": [10, 800]
+  },
+  {
+    "name": "Target",
+    "category": ["Shops", "General"],
+    "amountRange": [10, 400]
+  },
+  {
+    "name": "Walmart",
+    "category": ["Shops", "General"],
+    "amountRange": [10, 400]
+  },
+  {
+    "name": "Best Buy",
+    "category": ["Shops", "Electronics"],
+    "amountRange": [25, 1500]
+  },
+  {
+    "name": "Apple Store",
+    "category": ["Shops", "Electronics"],
+    "amountRange": [1, 3000]
+  },
+  {
+    "name": "The Home Depot",
+    "category": ["Shops", "Home Improvement"],
+    "amountRange": [15, 1000]
+  },
+  {
+    "name": "Lowe's",
+    "category": ["Shops", "Home Improvement"],
+    "amountRange": [15, 1000]
+  },
+  {
+    "name": "Macy's",
+    "category": ["Shops", "Department Store"],
+    "amountRange": [20, 500]
+  },
+  {
+    "name": "Nordstrom",
+    "category": ["Shops", "Department Store"],
+    "amountRange": [50, 1200]
+  },
+  {
+    "name": "IKEA",
+    "category": ["Shops", "Home Goods"],
+    "amountRange": [30, 900]
+  },
+  { "name": "Etsy", "category": ["Shops", "Online"], "amountRange": [10, 200] },
+  {
+    "name": "Nike",
+    "category": ["Shops", "Clothing"],
+    "amountRange": [50, 400]
+  },
+  {
+    "name": "Sephora",
+    "category": ["Shops", "Beauty"],
+    "amountRange": [20, 300]
+  },
+  {
+    "name": "Uber",
+    "category": ["Travel", "Rideshare"],
+    "amountRange": [8, 70]
+  },
+  {
+    "name": "Lyft",
+    "category": ["Travel", "Rideshare"],
+    "amountRange": [8, 70]
+  },
+  {
+    "name": "Delta Airlines",
+    "category": ["Travel", "Airlines"],
+    "amountRange": [150, 2000]
+  },
+  {
+    "name": "American Airlines",
+    "category": ["Travel", "Airlines"],
+    "amountRange": [150, 2000]
+  },
+  {
+    "name": "United Airlines",
+    "category": ["Travel", "Airlines"],
+    "amountRange": [150, 2000]
+  },
+  {
+    "name": "Marriott Hotels",
+    "category": ["Travel", "Hotels"],
+    "amountRange": [100, 1200]
+  },
+  {
+    "name": "Hilton Hotels",
+    "category": ["Travel", "Hotels"],
+    "amountRange": [100, 1200]
+  },
+  {
+    "name": "Airbnb",
+    "category": ["Travel", "Lodging"],
+    "amountRange": [80, 2500]
+  },
+  {
+    "name": "Hertz",
+    "category": ["Travel", "Car Rental"],
+    "amountRange": [50, 600]
+  },
+  {
+    "name": "NJ Transit",
+    "category": ["Travel", "Public Transit"],
+    "amountRange": [2.75, 50]
+  },
+  {
+    "name": "Verizon Wireless",
+    "category": ["Bills & Utilities", "Mobile Phone"],
+    "amountRange": [50, 250]
+  },
+  {
+    "name": "AT&T",
+    "category": ["Bills & Utilities", "Mobile Phone"],
+    "amountRange": [50, 250]
+  },
+  {
+    "name": "Comcast Xfinity",
+    "category": ["Bills & Utilities", "Internet"],
+    "amountRange": [50, 150]
+  },
+  {
+    "name": "Con Edison",
+    "category": ["Bills & Utilities", "Electricity"],
+    "amountRange": [40, 300]
+  },
+  {
+    "name": "PSEG",
+    "category": ["Bills & Utilities", "Gas & Electric"],
+    "amountRange": [60, 400]
+  },
+  {
+    "name": "City Water",
+    "category": ["Bills & Utilities", "Water"],
+    "amountRange": [30, 100]
+  },
+  {
+    "name": "Geico",
+    "category": ["Bills & Utilities", "Insurance"],
+    "amountRange": [100, 400]
+  },
+  {
+    "name": "CVS Pharmacy",
+    "category": ["Health & Wellness", "Pharmacy"],
+    "amountRange": [5, 150]
+  },
+  {
+    "name": "Walgreens",
+    "category": ["Health & Wellness", "Pharmacy"],
+    "amountRange": [5, 150]
+  },
+  {
+    "name": "Planet Fitness",
+    "category": ["Health & Wellness", "Gym"],
+    "amountRange": [10, 40]
+  },
+  {
+    "name": "Equinox",
+    "category": ["Health & Wellness", "Gym"],
+    "amountRange": [200, 300]
+  },
+  {
+    "name": "Doctor's Office Co-pay",
+    "category": ["Health & Wellness", "Medical"],
+    "amountRange": [20, 100]
+  },
+  {
+    "name": "Zocdoc",
+    "category": ["Health & Wellness", "Medical"],
+    "amountRange": [50, 300]
+  },
+  {
+    "name": "Netflix",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [9.99, 22.99]
+  },
+  {
+    "name": "Spotify",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [10.99, 16.99]
+  },
+  {
+    "name": "Hulu",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [7.99, 17.99]
+  },
+  {
+    "name": "Disney+",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [7.99, 13.99]
+  },
+  {
+    "name": "AMC Theatres",
+    "category": ["Entertainment", "Movies"],
+    "amountRange": [15, 80]
+  },
+  {
+    "name": "Ticketmaster",
+    "category": ["Entertainment", "Concerts"],
+    "amountRange": [50, 500]
+  },
+  {
+    "name": "Steam Games",
+    "category": ["Entertainment", "Gaming"],
+    "amountRange": [5, 100]
+  },
+  {
+    "name": "Playstation Network",
+    "category": ["Entertainment", "Gaming"],
+    "amountRange": [10, 70]
+  },
+  {
+    "name": "Barnes & Noble",
+    "category": ["Entertainment", "Books"],
+    "amountRange": [10, 100]
+  },
+  {
+    "name": "Shell Gas Station",
+    "category": ["Transportation", "Gas"],
+    "amountRange": [30, 80]
+  },
+  {
+    "name": "ExxonMobil",
+    "category": ["Transportation", "Gas"],
+    "amountRange": [30, 80]
+  },
+  {
+    "name": "Jiffy Lube",
+    "category": ["Transportation", "Car Maintenance"],
+    "amountRange": [50, 300]
+  },
+  {
+    "name": "EZ-Pass Toll",
+    "category": ["Transportation", "Tolls"],
+    "amountRange": [1.5, 20]
+  },
+  {
+    "name": "Parking Garage",
+    "category": ["Transportation", "Parking"],
+    "amountRange": [10, 50]
+  },
+  {
+    "name": "ATM Withdrawal",
+    "category": ["Financial", "Cash"],
+    "amountRange": [20, 200]
+  },
+  {
+    "name": "Bank of America Fee",
+    "category": ["Financial", "Bank Fee"],
+    "amountRange": [5, 35]
+  },
+  {
+    "name": "Coinbase",
+    "category": ["Financial", "Investment"],
+    "amountRange": [50, 1000]
+  },
+  {
+    "name": "Robinhood",
+    "category": ["Financial", "Investment"],
+    "amountRange": [50, 1000]
+  },
+  {
+    "name": "Zelle Transfer",
+    "category": ["Transfer", "Payment"],
+    "amountRange": [50, 2500]
+  },
+  {
+    "name": "Venmo Payment",
+    "category": ["Transfer", "Payment"],
+    "amountRange": [5, 200]
+  },
+  {
+    "name": "Cash App",
+    "category": ["Transfer", "Payment"],
+    "amountRange": [5, 200]
+  },
+  {
+    "name": "Rent Payment",
+    "category": ["Home", "Rent"],
+    "amountRange": [1500, 4000]
+  }
+]
+
+```
+
 `apps/backend/src/index.ts`:
 
 ```ts
@@ -226,12 +599,14 @@ import { plaidRoutes } from "./routes/plaid.route";
 import { clerkWebhookRoutes } from "./routes/clerk-webhook.route";
 import { connectToDb } from "./services/mongo.service";
 import { plaidWebhookRoutes } from "./routes/plaid-webhook.route";
+import { userRoutes } from "./routes/user.route";
 
 await connectToDb();
 
 const app = baseApp
   .get("/", () => ({ message: "Hello from Elysia!" }))
   .use(plaidRoutes)
+  .use(userRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
 
 console.log(
@@ -273,6 +648,7 @@ import {
   type ClerkUserEvent,
   type ClerkUserDeletedEvent,
 } from "@backend/schemas/user.schema";
+import { seedRandomTransactionsIfNone } from "@backend/services/transaction.service";
 
 export const clerkWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   "/clerk",
@@ -350,6 +726,8 @@ const handleUserCreated = async (event: ClerkUserEvent) => {
       firstName: data.first_name || undefined,
       lastName: data.last_name || undefined,
       imageUrl: data.image_url || undefined,
+      onboardingCompleted: false,
+      budgets: {},
     };
 
     const validatedUser = userSchema.parse({
@@ -369,6 +747,17 @@ const handleUserCreated = async (event: ClerkUserEvent) => {
 
     const result = await usersCollection.insertOne(validatedUser);
     console.log("User created successfully:", result.insertedId);
+
+    // Automatically seed random transactions for new users
+    try {
+      const seedResult = await seedRandomTransactionsIfNone(data.id);
+      console.log(
+        `Seeded ${seedResult.seeded} transactions for new user ${data.id}`
+      );
+    } catch (seedError) {
+      console.error("Error seeding transactions for new user:", seedError);
+      // Don't throw - user creation should succeed even if seeding fails
+    }
   } catch (error) {
     console.error("Error handling user creation:", error);
     throw error;
@@ -574,7 +963,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
 `apps/backend/src/routes/plaid.route.ts`:
 
 ```ts
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import {
   createLinkToken,
   disconnectPlaidItem,
@@ -601,19 +990,32 @@ export const plaidRoutes = (app: App) =>
         const res = await createLinkToken({ userId: userId });
         return res;
       })
-      .post("/exchangePublicToken", async ({ body, set, requireAuth }) => {
-        const userId = requireAuth();
-        const parsed = ExchangePublicTokenSchema.safeParse(body);
-        if (!parsed.success) {
-          set.status = 400;
-          return { error: "Invalid body" };
-        }
-        const res = await exchangePublicToken({
-          userId: userId,
-          publicToken: parsed.data.publicToken,
-        });
-        return res;
-      })
+      .post(
+        "/exchangePublicToken",
+        async ({ request, set, requireAuth }) => {
+          const userId = requireAuth();
+
+          let body: unknown;
+          try {
+            body = await request.json();
+          } catch {
+            set.status = 400;
+            return { error: "Invalid body" };
+          }
+
+          const parsed = ExchangePublicTokenSchema.safeParse(body);
+          if (!parsed.success) {
+            set.status = 400;
+            return { error: "Invalid body" };
+          }
+          const res = await exchangePublicToken({
+            userId: userId,
+            publicToken: parsed.data.publicToken,
+          });
+          return res;
+        },
+        { type: "none" }
+      )
       .post("/disconnect", async ({ requireAuth }) => {
         const userId = requireAuth();
         return await disconnectPlaidItem({ userId });
@@ -694,6 +1096,104 @@ export const plaidRoutes = (app: App) =>
         const userId = requireAuth();
         const result = await getAccounts({ userId });
         return result;
+      })
+  );
+
+```
+
+`apps/backend/src/routes/user.route.ts`:
+
+```ts
+import { Elysia } from "elysia";
+import { z } from "zod";
+import type { App } from "../app";
+import { getDb } from "../services/mongo.service";
+import type { User } from "../schemas/user.schema";
+import {
+  seedRandomTransactionsIfNone,
+  replaceWithSeedTransactions,
+} from "../services/transaction.service";
+import { disconnectPlaidItem } from "../services/plaid.service";
+
+const BudgetsSchema = z.record(z.string(), z.number());
+
+export const userRoutes = (app: App) =>
+  app.group("/api/user", (group) =>
+    group
+      .get("/me", async ({ requireAuth, set }) => {
+        const userId = requireAuth();
+        const db = getDb();
+        const users = db.collection<User>("users");
+        const user = await users.findOne(
+          { clerkId: userId },
+          { projection: { _id: 0 } }
+        );
+        if (!user) {
+          set.status = 404;
+          return { error: "User not found" };
+        }
+        return {
+          clerkId: user.clerkId,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          imageUrl: user.imageUrl,
+          onboardingCompleted: user.onboardingCompleted ?? false,
+          budgets: user.budgets ?? {},
+        };
+      })
+      .patch("/budgets", async ({ body, set, requireAuth }) => {
+        const userId = requireAuth();
+        const parsed = z.object({ budgets: BudgetsSchema }).safeParse(body);
+        if (!parsed.success) {
+          set.status = 400;
+          return { ok: false, error: "Invalid body" };
+        }
+        const db = getDb();
+        const users = db.collection<User>("users");
+        await users.updateOne(
+          { clerkId: userId },
+          {
+            $set: {
+              budgets: parsed.data.budgets,
+              updatedAt: new Date(),
+            },
+          }
+        );
+        return { ok: true };
+      })
+      .post("/onboarding/complete", async ({ body, set, requireAuth }) => {
+        const userId = requireAuth();
+        const parsed = z
+          .object({ budgets: BudgetsSchema.optional() })
+          .safeParse(body ?? {});
+        if (!parsed.success) {
+          set.status = 400;
+          return { ok: false, error: "Invalid body" };
+        }
+        const db = getDb();
+        const users = db.collection<User>("users");
+        const $set: Partial<User> = {
+          onboardingCompleted: true,
+          updatedAt: new Date(),
+        };
+        if (parsed.data.budgets) {
+          $set.budgets = parsed.data.budgets;
+        }
+        await users.updateOne({ clerkId: userId }, { $set });
+        return { ok: true };
+      })
+      .post("/useSeedTransactions", async ({ requireAuth, set }) => {
+        try {
+          const userId = requireAuth();
+          await disconnectPlaidItem({ userId });
+          const res = await replaceWithSeedTransactions(userId);
+          return res;
+        } catch (err) {
+          console.error("Error switching to seeded transactions:", err);
+          set.status = 500;
+          return { ok: false, error: "Internal server error" };
+        }
       })
   );
 
@@ -803,6 +1303,12 @@ export const userSchema = z.object({
   plaidTransactionsCursor: z.string().optional(),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
+
+  onboardingCompleted: z.boolean().default(false),
+
+  budgets: z.record(z.string(), z.number()).default({}),
+
+  seededTransactionsAt: z.date().optional(),
 });
 
 export type User = z.infer<typeof userSchema>;
@@ -890,6 +1396,13 @@ import { getDb } from "./mongo.service";
 import type { User } from "@backend/schemas/user.schema";
 import type { Transaction } from "@backend/schemas/transaction.schema";
 import { env } from "@backend/config";
+import { seedRandomTransactionsIfNone } from "./transaction.service";
+
+const daysAgo = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+};
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = process.env.PLAID_SECRET || "";
@@ -942,47 +1455,9 @@ export async function exchangePublicToken({
 
   const db = getDb();
   const usersCollection = db.collection<User>("users");
-  const transactionsCollection = db.collection<Transaction>("transactions");
 
-  console.log(
-    `Clearing any existing transactions for user ${userId} before sync`
-  );
-  await transactionsCollection.deleteMany({ clerkId: userId });
-
-  let cursor: string | undefined = undefined;
-  let added: PlaidTransaction[] = [];
-  let hasMore = true;
-
-  while (hasMore) {
-    const request = {
-      access_token: data.access_token,
-      cursor: cursor,
-    };
-    const response = await plaid.transactionsSync(request);
-    const newData = response.data;
-    added = added.concat(newData.added);
-    hasMore = newData.has_more;
-    cursor = newData.next_cursor;
-  }
-
-  if (added.length > 0) {
-    const initialTransactions = added.map((tx) => ({
-      clerkId: userId,
-      plaidTransactionId: tx.transaction_id,
-      plaidAccountId: tx.account_id,
-      amount: tx.amount,
-      date: tx.date,
-      name: tx.name,
-      paymentChannel: tx.payment_channel,
-      category: tx.category || undefined,
-      isoCurrencyCode: tx.iso_currency_code,
-      status: tx.pending ? ("pending" as const) : ("cleared" as const),
-    }));
-    await transactionsCollection.insertMany(initialTransactions as any);
-    console.log(
-      `Pulled ${added.length} initial transactions for user ${userId}.`
-    );
-  }
+  await seedRandomTransactionsIfNone(userId);
+  console.log(`Seeded random transactions for user ${userId}.`);
 
   await usersCollection.updateOne(
     { clerkId: userId },
@@ -991,7 +1466,6 @@ export async function exchangePublicToken({
         plaidAccessToken: data.access_token,
         plaidItemId: data.item_id,
         plaidConnectedAt: new Date(),
-        plaidTransactionsCursor: cursor,
         updatedAt: new Date(),
       },
     }
@@ -1013,9 +1487,9 @@ export async function getTransactions({
   const db = getDb();
   const transactionsCollection = db.collection<Transaction>("transactions");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const clearedDate = daysAgo(2);
   const result = await transactionsCollection.updateMany(
-    { clerkId: userId, status: "pending", date: { $lte: today } },
+    { clerkId: userId, status: "pending", date: { $lte: clearedDate } },
     { $set: { status: "cleared" } }
   );
 
@@ -1057,8 +1531,8 @@ export async function getUserPlaidStatus({ userId }: { userId: string }) {
   const user = await usersCollection.findOne({ clerkId: userId });
 
   return {
-    isConnected: !!user?.plaidAccessToken,
-    connectedAt: user?.plaidConnectedAt,
+    isConnected: !!user?.plaidAccessToken || !!user?.seededTransactionsAt,
+    connectedAt: user?.plaidConnectedAt ?? user?.seededTransactionsAt,
     itemId: user?.plaidItemId,
   };
 }
@@ -1175,7 +1649,15 @@ export async function disconnectPlaidItem({ userId }: { userId: string }) {
 ```ts
 import { getDb } from "./mongo.service";
 import type { Transaction } from "@backend/schemas/transaction.schema";
+import type { User } from "@backend/schemas/user.schema";
 import { ObjectId } from "mongodb";
+import { readFile } from "fs/promises";
+
+type Merchant = {
+  name: string;
+  category: string[];
+  amountRange: [number, number];
+};
 
 const daysAgo = (days: number): string => {
   const date = new Date();
@@ -1183,6 +1665,141 @@ const daysAgo = (days: number): string => {
   return date.toISOString().slice(0, 10);
 };
 
+const randomInt = (min: number, max: number) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
+
+const randomFloat2 = (min: number, max: number) =>
+  Math.round((Math.random() * (max - min) + min) * 100) / 100;
+
+let merchantsCache: Merchant[] | null = null;
+const loadMerchants = async (): Promise<Merchant[]> => {
+  if (merchantsCache) return merchantsCache;
+  const url = new URL("../data/merchants.json", import.meta.url);
+  const raw = await readFile(url, "utf8");
+  merchantsCache = JSON.parse(raw) as Merchant[];
+  return merchantsCache;
+};
+
+const randomPaymentChannel = () => {
+  const channels = ["in store", "online", "other"] as const;
+  return channels[randomInt(0, channels.length - 1)];
+};
+
+const buildRandomTransaction = (
+  clerkId: string,
+  m: Merchant
+): Omit<Transaction, "_id"> => {
+  const [min, max] = m.amountRange;
+  const baseAmount = randomFloat2(min, max);
+
+  const isTransfer = m.category.includes("Transfer");
+  const isPotentialIncome =
+    m.category.includes("Deposit") || m.category.includes("Payroll");
+
+  const isIncoming = isPotentialIncome
+    ? true
+    : isTransfer
+      ? Math.random() < 0.3
+      : false;
+
+  const amount = isIncoming ? -baseAmount : baseAmount;
+
+  const daysBack = randomInt(0, 119);
+  const date = daysAgo(daysBack);
+
+  const isRecent = daysBack <= 2;
+  const status = isRecent && Math.random() < 0.5 ? "pending" : "cleared";
+
+  return {
+    clerkId,
+    plaidTransactionId: `seed-${new ObjectId().toString()}`,
+    plaidAccountId: "account-checking-01",
+    amount,
+    date,
+    name: m.name,
+    paymentChannel: randomPaymentChannel(),
+    category: m.category,
+    isoCurrencyCode: "USD",
+    status,
+  };
+};
+
+export const generateRandomTransactionsForUser = async (
+  clerkId: string,
+  count?: number
+): Promise<Omit<Transaction, "_id">[]> => {
+  const merchants = await loadMerchants();
+  const n = count ?? randomInt(90, 100);
+
+  const transactions: Omit<Transaction, "_id">[] = [];
+  for (let i = 0; i < n; i++) {
+    const m = merchants[randomInt(0, merchants.length - 1)];
+    transactions.push(buildRandomTransaction(clerkId, m));
+  }
+  return transactions;
+};
+
+export const seedRandomTransactionsIfNone = async (clerkId: string) => {
+  const db = await getDb();
+  const transactionsCol = db.collection<Transaction>("transactions");
+  const usersCol = db.collection<User>("users");
+
+  const existingCount = await transactionsCol.countDocuments({ clerkId });
+  if (existingCount > 0) {
+    return {
+      ok: true as const,
+      seeded: 0,
+      message: "User already has transactions",
+    };
+  }
+
+  const docs = await generateRandomTransactionsForUser(clerkId);
+  if (docs.length === 0) {
+    return {
+      ok: true as const,
+      seeded: 0,
+      message: "No transactions generated",
+    };
+  }
+
+  await transactionsCol.insertMany(docs as any[]);
+  await usersCol.updateOne(
+    { clerkId },
+    { $set: { seededTransactionsAt: new Date(), updatedAt: new Date() } }
+  );
+
+  console.log(`Seeded ${docs.length} random transactions for user ${clerkId}.`);
+  return { ok: true as const, seeded: docs.length };
+};
+
+export const replaceWithSeedTransactions = async (
+  clerkId: string,
+  count?: number
+) => {
+  const db = await getDb();
+  const transactionsCol = db.collection<Transaction>("transactions");
+  const usersCol = db.collection<User>("users");
+
+  // Remove everything, then seed fresh
+  await transactionsCol.deleteMany({ clerkId });
+
+  const docs = await generateRandomTransactionsForUser(clerkId, count);
+  if (docs.length > 0) {
+    await transactionsCol.insertMany(docs as any[]);
+  }
+
+  await usersCol.updateOne(
+    { clerkId },
+    { $set: { seededTransactionsAt: new Date(), updatedAt: new Date() } }
+  );
+
+  console.log(
+    `Replaced transactions with ${docs.length} seeded transactions for user ${clerkId}.`
+  );
+  return { ok: true as const, seeded: docs.length };
+};
+
+// Existing helper for small fixed set seeding (kept for reference)
 export const seedInitialTransactions = async (clerkId: string) => {
   try {
     const db = await getDb();
@@ -1637,6 +2254,70 @@ export function usePlaid() {
 
 ```
 
+`apps/frontend/src/app/(app)/_hooks/use-user.ts`:
+
+```ts
+"use client";
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { eden } from "@/lib/api";
+import { useAuth } from "@clerk/nextjs";
+
+export function useUserProfile() {
+  const { getToken, isSignedIn } = useAuth();
+  const qc = useQueryClient();
+
+  const { data: me, isLoading } = useQuery({
+    queryKey: ["user", "me"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+      const res = await eden.api.user.me.get({
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.data;
+    },
+    enabled: isSignedIn,
+  });
+
+  const saveBudgets = useMutation({
+    mutationFn: async (budgets: Record<string, number>) => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+      return eden.api.user.budgets.patch(
+        { budgets },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user", "me"] });
+    },
+  });
+
+  const completeOnboarding = useMutation({
+    mutationFn: async (budgets?: Record<string, number>) => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+      return eden.api.user.onboarding.complete.post(
+        budgets ? { budgets } : undefined,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user", "me"] });
+    },
+  });
+
+  return {
+    me,
+    loading: isLoading,
+    saveBudgets,
+    completeOnboarding,
+  };
+}
+
+```
+
 `apps/frontend/src/app/(app)/admin/_components/transactions-form.tsx`:
 
 ```tsx
@@ -2041,14 +2722,27 @@ export default function AdminPage() {
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import React from "react";
+import { eden } from "@/lib/api";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) redirect("/sign-in");
+
+  const token = await getToken();
+  if (token) {
+    const res = await eden.api.user.me.get({
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const me = res.data as any;
+    // if (me && me.onboardingCompleted === false) {
+    //   redirect("/onboarding");
+    // }
+  }
+
   return children;
 }
 
@@ -2404,6 +3098,202 @@ export default function RootLayout({
         </body>
       </html>
     </ClerkProvider>
+  );
+}
+
+```
+
+`apps/frontend/src/app/onboarding/page.tsx`:
+
+```tsx
+"use client";
+
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { usePlaid } from "@/app/(app)/_hooks/use-plaid";
+import { useUserProfile } from "@/app/(app)/_hooks/use-user";
+import { useAuth } from "@clerk/nextjs";
+import { usePlaidLink } from "react-plaid-link";
+
+type Tx = {
+  amount: number;
+  date: string;
+  name: string;
+  category?: string[];
+  status: "pending" | "cleared";
+};
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  const { isSignedIn } = useAuth();
+  const {
+    linkToken,
+    onLinkSuccess,
+    transactions,
+    checkingStatus,
+    isConnected,
+    transactionsLoading,
+  } = usePlaid();
+  const { me, loading, completeOnboarding } = useUserProfile();
+
+  const [budgets, setBudgets] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (me?.onboardingCompleted) {
+      router.replace("/");
+    }
+  }, [me?.onboardingCompleted, router]);
+
+  useEffect(() => {
+    if (me?.budgets) setBudgets(me.budgets);
+  }, [me?.budgets]);
+
+  const linkOptions = useMemo(
+    () => ({
+      token: linkToken ?? "",
+      onSuccess: (publicToken: string) => onLinkSuccess(publicToken),
+    }),
+    [linkToken, onLinkSuccess]
+  );
+  const { open, ready } = usePlaidLink(linkOptions);
+
+  const last30Days = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const txs = (transactions ?? []) as Tx[];
+
+  const income30 = useMemo(() => {
+    const clearedRecent = txs.filter(
+      (t) => t.status === "cleared" && t.date >= last30Days
+    );
+    const incomes = clearedRecent.filter(
+      (t) =>
+        t.amount < 0 ||
+        t.category?.includes("Payroll") ||
+        t.category?.includes("Deposit")
+    );
+    return incomes.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  }, [txs, last30Days]);
+
+  const categoryTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    txs
+      .filter((t) => t.status === "cleared" && t.amount > 0)
+      .forEach((t) => {
+        const top = t.category?.[0] ?? "Other";
+        map.set(top, (map.get(top) ?? 0) + t.amount);
+      });
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .reduce<Record<string, number>>((acc, [k, v]) => ((acc[k] = v), acc), {});
+  }, [txs]);
+
+  const mergedBudgets = useMemo(() => {
+    const b = { ...budgets };
+    Object.keys(categoryTotals).forEach((k) => {
+      if (b[k] == null) b[k] = Math.round(categoryTotals[k]);
+    });
+    return b;
+  }, [budgets, categoryTotals]);
+
+  const [saving, setSaving] = useState(false);
+  const handleComplete = async () => {
+    try {
+      setSaving(true);
+      await completeOnboarding.mutateAsync(mergedBudgets);
+      router.replace("/");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isSignedIn) return null;
+
+  return (
+    <div className="font-sans min-h-screen p-8 max-w-3xl mx-auto flex flex-col gap-8">
+      <div className="rounded-xl border p-6 flex flex-col gap-4">
+        <h1 className="text-2xl font-semibold">Welcome!</h1>
+        {checkingStatus || transactionsLoading ? (
+          <p>Loading your data…</p>
+        ) : !isConnected ? (
+          <div className="flex items-center gap-3">
+            <button
+              disabled={!ready}
+              onClick={() => open()}
+              className="px-4 py-2 bg-black text-white rounded"
+            >
+              Connect your bank
+            </button>
+            <p className="text-sm text-gray-600">
+              Connect to pull your transactions, then we’ll show your summary.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="text-lg">
+              You make <span className="font-bold">${income30.toFixed(2)}</span>{" "}
+              over the last 30 days.
+            </p>
+            <button
+              onClick={handleComplete}
+              disabled={saving}
+              className="self-start px-4 py-2 bg-black text-white rounded"
+            >
+              {saving ? "Saving…" : "I understand"}
+            </button>
+          </>
+        )}
+      </div>
+
+      {Object.keys(categoryTotals).length > 0 && (
+        <div className="rounded-xl border p-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Your spending by category
+          </h2>
+          <div className="grid grid-cols-1 gap-3">
+            {Object.entries(categoryTotals).map(([cat, total]) => (
+              <div
+                key={cat}
+                className="flex items-center justify-between gap-3 border rounded p-3"
+              >
+                <div className="flex-1">
+                  <div className="font-medium">{cat}</div>
+                  <div className="text-sm text-gray-600">
+                    Last 30 days: ${total.toFixed(2)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-700">Budget</label>
+                  <input
+                    type="number"
+                    className="border rounded px-2 py-1 w-32"
+                    value={mergedBudgets[cat] ?? 0}
+                    onChange={(e) =>
+                      setBudgets((prev) => ({
+                        ...prev,
+                        [cat]: Number(e.target.value || 0),
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex gap-3">
+            <button
+              disabled={saving}
+              onClick={handleComplete}
+              className="px-4 py-2 bg-black text-white rounded"
+            >
+              {saving ? "Saving…" : "Save budgets and finish"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
