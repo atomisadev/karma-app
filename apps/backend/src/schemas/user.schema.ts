@@ -6,22 +6,28 @@ export const userSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   imageUrl: z.string().optional(),
+  plaidAccessToken: z.string().optional(),
+  plaidItemId: z.string().optional(),
+  plaidConnectedAt: z.date().optional(),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
 });
 
 export type User = z.infer<typeof userSchema>;
 
-export const clerkWebhookEventSchema = z.object({
+export const clerkBaseEventSchema = z.object({
   type: z.string(),
+  data: z.unknown(),
+});
+
+export const clerkUserEventSchema = z.object({
+  type: z.union([z.literal("user.created"), z.literal("user.updated")]),
   data: z.object({
     id: z.string(),
     email_addresses: z.array(
       z.object({
         email_address: z.string(),
-        verification: z.object({
-          status: z.string(),
-        }),
+        verification: z.object({ status: z.string() }).optional(),
       })
     ),
     first_name: z.string().nullable(),
@@ -32,4 +38,11 @@ export const clerkWebhookEventSchema = z.object({
   }),
 });
 
-export type ClerkWebhookEvent = z.infer<typeof clerkWebhookEventSchema>;
+export const clerkUserDeletedEventSchema = z.object({
+  type: z.literal("user.deleted"),
+  data: z.object({ id: z.string() }),
+});
+
+export type ClerkBaseEvent = z.infer<typeof clerkBaseEventSchema>;
+export type ClerkUserEvent = z.infer<typeof clerkUserEventSchema>;
+export type ClerkUserDeletedEvent = z.infer<typeof clerkUserDeletedEventSchema>;

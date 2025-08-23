@@ -2,6 +2,9 @@ import { app as baseApp } from "./app";
 
 import { plaidRoutes } from "./routes/plaid.route";
 import { webhookRoutes } from "./routes/webhook.route";
+import { connectToDb } from "./services/mongo.service";
+
+await connectToDb();
 
 const app = baseApp
   .get("/", () => ({ message: "Hello from Elysia!" }))

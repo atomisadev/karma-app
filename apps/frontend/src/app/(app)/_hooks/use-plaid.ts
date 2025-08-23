@@ -1,64 +1,105 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { eden } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 
 export function usePlaid() {
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const { getToken, isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!isSignedIn) return;
-    getToken().then((token) => {
-      if (!token) return;
-      eden.api.plaid.createLinkToken
-        .post(undefined, { headers: { Authorization: `Bearer ${token}` } })
-        .then(({ data }) => setLinkToken(data?.linkToken || null))
-        .catch(() => setLinkToken(null));
-    });
-  }, [isSignedIn, getToken]);
+  // Query for Plaid status
+  const {
+    data: statusData,
+    isLoading: checkingStatus,
+    error: statusError,
+  } = useQuery({
+    queryKey: ["plaid", "status"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      const response = await eden.api.plaid.status.get({
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    },
+    enabled: isSignedIn,
+  });
+
+  const isConnected = statusData?.isConnected || false;
+
+  // Query for link token (only when not connected)
+  const { data: linkTokenData, isLoading: linkTokenLoading } = useQuery({
+    queryKey: ["plaid", "linkToken"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      const response = await eden.api.plaid.createLinkToken.post(undefined, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    },
+    enabled: isSignedIn && !isConnected && !checkingStatus,
+  });
+
+  // Query for transactions (only when connected)
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    refetch: refetchTransactions,
+  } = useQuery({
+    queryKey: ["plaid", "transactions"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      const response = await eden.api.plaid.transactions.get({
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    },
+    enabled: isSignedIn && isConnected,
+  });
+
+  // Mutation for exchanging public token
+  const exchangeTokenMutation = useMutation({
+    mutationFn: async (publicToken: string) => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      return eden.api.plaid.exchangePublicToken.post(
+        { publicToken },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    },
+    onSuccess: () => {
+      // Invalidate and refetch status and transactions
+      queryClient.invalidateQueries({ queryKey: ["plaid", "status"] });
+      queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
+    },
+  });
 
   const onLinkSuccess = useCallback(
     (publicToken: string) => {
-      setLoading(true);
-      getToken().then((token) => {
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-        eden.api.plaid.exchangePublicToken
-          .post(
-            { publicToken },
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          .then(() =>
-            eden.api.plaid.transactions.get({
-              headers: { Authorization: `Bearer ${token}` },
-            })
-          )
-          .then(({ data }) => setTransactions(data?.transactions || []))
-          .finally(() => setLoading(false));
-      });
+      exchangeTokenMutation.mutate(publicToken);
     },
-    [getToken]
+    [exchangeTokenMutation]
   );
 
   const refreshTransactions = useCallback(() => {
-    getToken().then((token) => {
-      if (!token) return;
-      eden.api.plaid.transactions
-        .get({ headers: { Authorization: `Bearer ${token}` } })
-        .then(({ data }) => setTransactions(data?.transactions || []));
-    });
-  }, [getToken]);
+    refetchTransactions();
+  }, [refetchTransactions]);
 
   return {
-    linkToken,
-    transactions,
-    loading,
+    linkToken: linkTokenData?.linkToken || null,
+    transactions: transactionsData?.transactions || [],
+    loading: exchangeTokenMutation.isPending,
+    isConnected,
+    checkingStatus: checkingStatus || linkTokenLoading,
+    transactionsLoading,
     onLinkSuccess,
     refreshTransactions,
   };

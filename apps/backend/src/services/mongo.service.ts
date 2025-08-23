@@ -1,22 +1,26 @@
 import { MongoClient, Db } from "mongodb";
 import { env } from "@backend/config";
 
-let client: MongoClient | null = null;
 let db: Db | null = null;
+const client = new MongoClient(env.MONGODB_URI);
 
-export const getDb = async () => {
+export const connectToDb = async () => {
   if (db) return db;
 
-  if (!client) client = new MongoClient(env.MONGODB_URI);
-  await client.connect();
-  db = client.db(env.MONGODB_DB);
-  return db;
+  try {
+    console.log("Connecting to MongoDB...");
+    await client.connect();
+    db = client.db(env.MONGODB_DB);
+    console.log("Successfully connected to MongoDB.");
+  } catch (error) {
+    console.error("Failed to connect to MongoDB:", error);
+    process.exit(1);
+  }
 };
 
-export const closeDb = async () => {
-  if (client) {
-    await client.close();
-    client = null;
-    db = null;
+export const getDb = () => {
+  if (!db) {
+    throw new Error("Database not initialized. Calll connectToDb first.");
   }
+  return db;
 };

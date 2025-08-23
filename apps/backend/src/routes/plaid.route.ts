@@ -3,6 +3,7 @@ import {
   createLinkToken,
   exchangePublicToken,
   getTransactions,
+  getUserPlaidStatus,
   sandboxCreateTransactions,
 } from "../services/plaid.service";
 import {
@@ -72,4 +73,14 @@ export const plaidRoutes = (app: App) =>
           return { ok: true };
         }
       )
+      .get("/status", async ({ requireAuth }) => {
+        const userId = requireAuth();
+        const status = await getUserPlaidStatus({ userId });
+        return status;
+      })
+      .get("/accounts", async ({ requireAuth }) => {
+        const userId = requireAuth();
+        const result = await getAccounts({ userId });
+        return result;
+      })
   );

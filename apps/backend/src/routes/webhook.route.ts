@@ -3,11 +3,14 @@ import { Webhook } from "svix";
 import { env } from "@backend/config";
 import { getDb } from "@backend/services/mongo.service";
 import {
-  clerkWebhookEventSchema,
+  clerkBaseEventSchema,
+  clerkUserEventSchema,
+  clerkUserDeletedEventSchema,
   userSchema,
   type User,
+  type ClerkUserEvent,
+  type ClerkUserDeletedEvent,
 } from "@backend/schemas/user.schema";
-import { parse } from "zod";
 
 export const webhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   "/clerk",
@@ -24,7 +27,7 @@ export const webhookRoutes = new Elysia({ prefix: "/webhook" }).post(
         return { error: "Missing svix headers" };
       }
 
-      let event;
+      let event: unknown;
       try {
         event = webhook.verify(JSON.stringify(body), {
           "svix-id": svixId,
@@ -37,20 +40,23 @@ export const webhookRoutes = new Elysia({ prefix: "/webhook" }).post(
         return { error: "Webhook verification failed" };
       }
 
-      const parsedEvent = clerkWebhookEventSchema.parse(event);
+      const baseEvent = clerkBaseEventSchema.parse(event);
 
-      switch (parsedEvent.type) {
+      switch (baseEvent.type) {
         case "user.created":
           console.log("User created");
-          await handleUserCreated(parsedEvent);
+          await handleUserCreated(clerkUserEventSchema.parse(event));
           break;
         case "user.updated":
           console.log("User updated");
-          await handleUserUpdated(parsedEvent);
+          await handleUserUpdated(clerkUserEventSchema.parse(event));
           break;
         case "user.deleted":
           console.log("User deleted");
-          await handleUserDeleted(parsedEvent);
+          await handleUserDeleted(clerkUserDeletedEventSchema.parse(event));
+          break;
+        default:
+          // Ignore other event types
           break;
       }
 
@@ -63,11 +69,10 @@ export const webhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   }
 );
 
-const handleUserCreated = async (event: any) => {
+const handleUserCreated = async (event: ClerkUserEvent) => {
   try {
     const { data } = event;
 
-    // Get the primary email address
     const primaryEmail =
       data.email_addresses.find(
         (email: any) => email.verification?.status === "verified"
@@ -86,25 +91,21 @@ const handleUserCreated = async (event: any) => {
       imageUrl: data.image_url || undefined,
     };
 
-    // Validate the user data
     const validatedUser = userSchema.parse({
       ...userData,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at),
     });
 
-    // Save to MongoDB
     const db = await getDb();
     const usersCollection = db.collection<User>("users");
 
-    // Check if user already exists
     const existingUser = await usersCollection.findOne({ clerkId: data.id });
     if (existingUser) {
       console.log("User already exists:", data.id);
       return;
     }
 
-    // Insert the new user
     const result = await usersCollection.insertOne(validatedUser);
     console.log("User created successfully:", result.insertedId);
   } catch (error) {
@@ -113,11 +114,10 @@ const handleUserCreated = async (event: any) => {
   }
 };
 
-const handleUserUpdated = async (event: any) => {
+const handleUserUpdated = async (event: ClerkUserEvent) => {
   try {
     const { data } = event;
 
-    // Get the primary email address
     const primaryEmail =
       data.email_addresses.find(
         (email: any) => email.verification?.status === "verified"
@@ -136,7 +136,6 @@ const handleUserUpdated = async (event: any) => {
       updatedAt: new Date(data.updated_at),
     };
 
-    // Save to MongoDB
     const db = await getDb();
     const usersCollection = db.collection<User>("users");
 
@@ -157,11 +156,10 @@ const handleUserUpdated = async (event: any) => {
   }
 };
 
-const handleUserDeleted = async (event: any) => {
+const handleUserDeleted = async (event: ClerkUserDeletedEvent) => {
   try {
     const { data } = event;
 
-    // Save to MongoDB
     const db = await getDb();
     const usersCollection = db.collection<User>("users");
 
