@@ -11,6 +11,7 @@ import {
   type ClerkUserEvent,
   type ClerkUserDeletedEvent,
 } from "@backend/schemas/user.schema";
+import { seedRandomTransactionsIfNone } from "@backend/services/transaction.service";
 
 export const clerkWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   "/clerk",
@@ -88,6 +89,8 @@ const handleUserCreated = async (event: ClerkUserEvent) => {
       firstName: data.first_name || undefined,
       lastName: data.last_name || undefined,
       imageUrl: data.image_url || undefined,
+      onboardingCompleted: false,
+      budgets: {},
     };
 
     const validatedUser = userSchema.parse({
@@ -107,6 +110,17 @@ const handleUserCreated = async (event: ClerkUserEvent) => {
 
     const result = await usersCollection.insertOne(validatedUser);
     console.log("User created successfully:", result.insertedId);
+
+    // Automatically seed random transactions for new users
+    try {
+      const seedResult = await seedRandomTransactionsIfNone(data.id);
+      console.log(
+        `Seeded ${seedResult.seeded} transactions for new user ${data.id}`
+      );
+    } catch (seedError) {
+      console.error("Error seeding transactions for new user:", seedError);
+      // Don't throw - user creation should succeed even if seeding fails
+    }
   } catch (error) {
     console.error("Error handling user creation:", error);
     throw error;

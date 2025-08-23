@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import {
   createLinkToken,
   disconnectPlaidItem,
@@ -25,19 +25,32 @@ export const plaidRoutes = (app: App) =>
         const res = await createLinkToken({ userId: userId });
         return res;
       })
-      .post("/exchangePublicToken", async ({ body, set, requireAuth }) => {
-        const userId = requireAuth();
-        const parsed = ExchangePublicTokenSchema.safeParse(body);
-        if (!parsed.success) {
-          set.status = 400;
-          return { error: "Invalid body" };
-        }
-        const res = await exchangePublicToken({
-          userId: userId,
-          publicToken: parsed.data.publicToken,
-        });
-        return res;
-      })
+      .post(
+        "/exchangePublicToken",
+        async ({ request, set, requireAuth }) => {
+          const userId = requireAuth();
+
+          let body: unknown;
+          try {
+            body = await request.json();
+          } catch {
+            set.status = 400;
+            return { error: "Invalid body" };
+          }
+
+          const parsed = ExchangePublicTokenSchema.safeParse(body);
+          if (!parsed.success) {
+            set.status = 400;
+            return { error: "Invalid body" };
+          }
+          const res = await exchangePublicToken({
+            userId: userId,
+            publicToken: parsed.data.publicToken,
+          });
+          return res;
+        },
+        { type: "none" }
+      )
       .post("/disconnect", async ({ requireAuth }) => {
         const userId = requireAuth();
         return await disconnectPlaidItem({ userId });

@@ -12,6 +12,12 @@ export const userSchema = z.object({
   plaidTransactionsCursor: z.string().optional(),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
+
+  onboardingCompleted: z.boolean().default(false),
+
+  budgets: z.record(z.string(), z.number()).default({}),
+
+  seededTransactionsAt: z.date().optional(),
 });
 
 export type User = z.infer<typeof userSchema>;

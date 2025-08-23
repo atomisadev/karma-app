@@ -12,6 +12,7 @@ import { getDb } from "./mongo.service";
 import type { User } from "@backend/schemas/user.schema";
 import type { Transaction } from "@backend/schemas/transaction.schema";
 import { env } from "@backend/config";
+import { seedRandomTransactionsIfNone } from "./transaction.service";
 
 const daysAgo = (days: number): string => {
   const date = new Date();
@@ -70,47 +71,9 @@ export async function exchangePublicToken({
 
   const db = getDb();
   const usersCollection = db.collection<User>("users");
-  const transactionsCollection = db.collection<Transaction>("transactions");
 
-  console.log(
-    `Clearing any existing transactions for user ${userId} before sync`
-  );
-  await transactionsCollection.deleteMany({ clerkId: userId });
-
-  let cursor: string | undefined = undefined;
-  let added: PlaidTransaction[] = [];
-  let hasMore = true;
-
-  while (hasMore) {
-    const request = {
-      access_token: data.access_token,
-      cursor: cursor,
-    };
-    const response = await plaid.transactionsSync(request);
-    const newData = response.data;
-    added = added.concat(newData.added);
-    hasMore = newData.has_more;
-    cursor = newData.next_cursor;
-  }
-
-  if (added.length > 0) {
-    const initialTransactions = added.map((tx) => ({
-      clerkId: userId,
-      plaidTransactionId: tx.transaction_id,
-      plaidAccountId: tx.account_id,
-      amount: tx.amount,
-      date: tx.date,
-      name: tx.name,
-      paymentChannel: tx.payment_channel,
-      category: tx.category || undefined,
-      isoCurrencyCode: tx.iso_currency_code,
-      status: tx.pending ? ("pending" as const) : ("cleared" as const),
-    }));
-    await transactionsCollection.insertMany(initialTransactions as any);
-    console.log(
-      `Pulled ${added.length} initial transactions for user ${userId}.`
-    );
-  }
+  await seedRandomTransactionsIfNone(userId);
+  console.log(`Seeded random transactions for user ${userId}.`);
 
   await usersCollection.updateOne(
     { clerkId: userId },
@@ -119,7 +82,6 @@ export async function exchangePublicToken({
         plaidAccessToken: data.access_token,
         plaidItemId: data.item_id,
         plaidConnectedAt: new Date(),
-        plaidTransactionsCursor: cursor,
         updatedAt: new Date(),
       },
     }
@@ -185,8 +147,8 @@ export async function getUserPlaidStatus({ userId }: { userId: string }) {
   const user = await usersCollection.findOne({ clerkId: userId });
 
   return {
-    isConnected: !!user?.plaidAccessToken,
-    connectedAt: user?.plaidConnectedAt,
+    isConnected: !!user?.plaidAccessToken || !!user?.seededTransactionsAt,
+    connectedAt: user?.plaidConnectedAt ?? user?.seededTransactionsAt,
     itemId: user?.plaidItemId,
   };
 }

@@ -1,0 +1,361 @@
+[
+  {
+    "name": "Starbucks",
+    "category": ["Food and Drink", "Coffee Shop"],
+    "amountRange": [4, 25]
+  },
+  {
+    "name": "Dunkin'",
+    "category": ["Food and Drink", "Coffee Shop"],
+    "amountRange": [3, 20]
+  },
+  {
+    "name": "McDonald's",
+    "category": ["Food and Drink", "Fast Food"],
+    "amountRange": [5, 30]
+  },
+  {
+    "name": "Subway",
+    "category": ["Food and Drink", "Fast Food"],
+    "amountRange": [8, 25]
+  },
+  {
+    "name": "Chipotle Mexican Grill",
+    "category": ["Food and Drink", "Restaurants"],
+    "amountRange": [10, 40]
+  },
+  {
+    "name": "The Cheesecake Factory",
+    "category": ["Food and Drink", "Restaurants"],
+    "amountRange": [40, 200]
+  },
+  {
+    "name": "Olive Garden",
+    "category": ["Food and Drink", "Restaurants"],
+    "amountRange": [30, 150]
+  },
+  {
+    "name": "Uber Eats",
+    "category": ["Food and Drink", "Delivery"],
+    "amountRange": [15, 100]
+  },
+  {
+    "name": "DoorDash",
+    "category": ["Food and Drink", "Delivery"],
+    "amountRange": [15, 100]
+  },
+  {
+    "name": "Grubhub",
+    "category": ["Food and Drink", "Delivery"],
+    "amountRange": [15, 100]
+  },
+  {
+    "name": "Local Pub",
+    "category": ["Food and Drink", "Bar"],
+    "amountRange": [20, 120]
+  },
+  {
+    "name": "Whole Foods Market",
+    "category": ["Groceries"],
+    "amountRange": [20, 300]
+  },
+  {
+    "name": "Trader Joe's",
+    "category": ["Groceries"],
+    "amountRange": [20, 250]
+  },
+  { "name": "Kroger", "category": ["Groceries"], "amountRange": [15, 350] },
+  { "name": "Safeway", "category": ["Groceries"], "amountRange": [15, 300] },
+  {
+    "name": "Costco",
+    "category": ["Groceries", "Shops"],
+    "amountRange": [50, 700]
+  },
+  { "name": "H-E-B", "category": ["Groceries"], "amountRange": [20, 400] },
+  {
+    "name": "Amazon.com*Purchase",
+    "category": ["Shops", "Online"],
+    "amountRange": [10, 800]
+  },
+  {
+    "name": "Target",
+    "category": ["Shops", "General"],
+    "amountRange": [10, 400]
+  },
+  {
+    "name": "Walmart",
+    "category": ["Shops", "General"],
+    "amountRange": [10, 400]
+  },
+  {
+    "name": "Best Buy",
+    "category": ["Shops", "Electronics"],
+    "amountRange": [25, 1500]
+  },
+  {
+    "name": "Apple Store",
+    "category": ["Shops", "Electronics"],
+    "amountRange": [1, 3000]
+  },
+  {
+    "name": "The Home Depot",
+    "category": ["Shops", "Home Improvement"],
+    "amountRange": [15, 1000]
+  },
+  {
+    "name": "Lowe's",
+    "category": ["Shops", "Home Improvement"],
+    "amountRange": [15, 1000]
+  },
+  {
+    "name": "Macy's",
+    "category": ["Shops", "Department Store"],
+    "amountRange": [20, 500]
+  },
+  {
+    "name": "Nordstrom",
+    "category": ["Shops", "Department Store"],
+    "amountRange": [50, 1200]
+  },
+  {
+    "name": "IKEA",
+    "category": ["Shops", "Home Goods"],
+    "amountRange": [30, 900]
+  },
+  { "name": "Etsy", "category": ["Shops", "Online"], "amountRange": [10, 200] },
+  {
+    "name": "Nike",
+    "category": ["Shops", "Clothing"],
+    "amountRange": [50, 400]
+  },
+  {
+    "name": "Sephora",
+    "category": ["Shops", "Beauty"],
+    "amountRange": [20, 300]
+  },
+  {
+    "name": "Uber",
+    "category": ["Travel", "Rideshare"],
+    "amountRange": [8, 70]
+  },
+  {
+    "name": "Lyft",
+    "category": ["Travel", "Rideshare"],
+    "amountRange": [8, 70]
+  },
+  {
+    "name": "Delta Airlines",
+    "category": ["Travel", "Airlines"],
+    "amountRange": [150, 2000]
+  },
+  {
+    "name": "American Airlines",
+    "category": ["Travel", "Airlines"],
+    "amountRange": [150, 2000]
+  },
+  {
+    "name": "United Airlines",
+    "category": ["Travel", "Airlines"],
+    "amountRange": [150, 2000]
+  },
+  {
+    "name": "Marriott Hotels",
+    "category": ["Travel", "Hotels"],
+    "amountRange": [100, 1200]
+  },
+  {
+    "name": "Hilton Hotels",
+    "category": ["Travel", "Hotels"],
+    "amountRange": [100, 1200]
+  },
+  {
+    "name": "Airbnb",
+    "category": ["Travel", "Lodging"],
+    "amountRange": [80, 2500]
+  },
+  {
+    "name": "Hertz",
+    "category": ["Travel", "Car Rental"],
+    "amountRange": [50, 600]
+  },
+  {
+    "name": "NJ Transit",
+    "category": ["Travel", "Public Transit"],
+    "amountRange": [2.75, 50]
+  },
+  {
+    "name": "Verizon Wireless",
+    "category": ["Bills & Utilities", "Mobile Phone"],
+    "amountRange": [50, 250]
+  },
+  {
+    "name": "AT&T",
+    "category": ["Bills & Utilities", "Mobile Phone"],
+    "amountRange": [50, 250]
+  },
+  {
+    "name": "Comcast Xfinity",
+    "category": ["Bills & Utilities", "Internet"],
+    "amountRange": [50, 150]
+  },
+  {
+    "name": "Con Edison",
+    "category": ["Bills & Utilities", "Electricity"],
+    "amountRange": [40, 300]
+  },
+  {
+    "name": "PSEG",
+    "category": ["Bills & Utilities", "Gas & Electric"],
+    "amountRange": [60, 400]
+  },
+  {
+    "name": "City Water",
+    "category": ["Bills & Utilities", "Water"],
+    "amountRange": [30, 100]
+  },
+  {
+    "name": "Geico",
+    "category": ["Bills & Utilities", "Insurance"],
+    "amountRange": [100, 400]
+  },
+  {
+    "name": "CVS Pharmacy",
+    "category": ["Health & Wellness", "Pharmacy"],
+    "amountRange": [5, 150]
+  },
+  {
+    "name": "Walgreens",
+    "category": ["Health & Wellness", "Pharmacy"],
+    "amountRange": [5, 150]
+  },
+  {
+    "name": "Planet Fitness",
+    "category": ["Health & Wellness", "Gym"],
+    "amountRange": [10, 40]
+  },
+  {
+    "name": "Equinox",
+    "category": ["Health & Wellness", "Gym"],
+    "amountRange": [200, 300]
+  },
+  {
+    "name": "Doctor's Office Co-pay",
+    "category": ["Health & Wellness", "Medical"],
+    "amountRange": [20, 100]
+  },
+  {
+    "name": "Zocdoc",
+    "category": ["Health & Wellness", "Medical"],
+    "amountRange": [50, 300]
+  },
+  {
+    "name": "Netflix",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [9.99, 22.99]
+  },
+  {
+    "name": "Spotify",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [10.99, 16.99]
+  },
+  {
+    "name": "Hulu",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [7.99, 17.99]
+  },
+  {
+    "name": "Disney+",
+    "category": ["Entertainment", "Streaming"],
+    "amountRange": [7.99, 13.99]
+  },
+  {
+    "name": "AMC Theatres",
+    "category": ["Entertainment", "Movies"],
+    "amountRange": [15, 80]
+  },
+  {
+    "name": "Ticketmaster",
+    "category": ["Entertainment", "Concerts"],
+    "amountRange": [50, 500]
+  },
+  {
+    "name": "Steam Games",
+    "category": ["Entertainment", "Gaming"],
+    "amountRange": [5, 100]
+  },
+  {
+    "name": "Playstation Network",
+    "category": ["Entertainment", "Gaming"],
+    "amountRange": [10, 70]
+  },
+  {
+    "name": "Barnes & Noble",
+    "category": ["Entertainment", "Books"],
+    "amountRange": [10, 100]
+  },
+  {
+    "name": "Shell Gas Station",
+    "category": ["Transportation", "Gas"],
+    "amountRange": [30, 80]
+  },
+  {
+    "name": "ExxonMobil",
+    "category": ["Transportation", "Gas"],
+    "amountRange": [30, 80]
+  },
+  {
+    "name": "Jiffy Lube",
+    "category": ["Transportation", "Car Maintenance"],
+    "amountRange": [50, 300]
+  },
+  {
+    "name": "EZ-Pass Toll",
+    "category": ["Transportation", "Tolls"],
+    "amountRange": [1.5, 20]
+  },
+  {
+    "name": "Parking Garage",
+    "category": ["Transportation", "Parking"],
+    "amountRange": [10, 50]
+  },
+  {
+    "name": "ATM Withdrawal",
+    "category": ["Financial", "Cash"],
+    "amountRange": [20, 200]
+  },
+  {
+    "name": "Bank of America Fee",
+    "category": ["Financial", "Bank Fee"],
+    "amountRange": [5, 35]
+  },
+  {
+    "name": "Coinbase",
+    "category": ["Financial", "Investment"],
+    "amountRange": [50, 1000]
+  },
+  {
+    "name": "Robinhood",
+    "category": ["Financial", "Investment"],
+    "amountRange": [50, 1000]
+  },
+  {
+    "name": "Zelle Transfer",
+    "category": ["Transfer", "Payment"],
+    "amountRange": [50, 2500]
+  },
+  {
+    "name": "Venmo Payment",
+    "category": ["Transfer", "Payment"],
+    "amountRange": [5, 200]
+  },
+  {
+    "name": "Cash App",
+    "category": ["Transfer", "Payment"],
+    "amountRange": [5, 200]
+  },
+  {
+    "name": "Rent Payment",
+    "category": ["Home", "Rent"],
+    "amountRange": [1500, 4000]
+  }
+]
