@@ -8,6 +8,7 @@ import {
   replaceWithSeedTransactions,
 } from "../services/transaction.service";
 import { disconnectPlaidItem } from "../services/plaid.service";
+import { request } from "http";
 
 const BudgetsSchema = z.record(z.string(), z.number());
 
@@ -56,8 +57,18 @@ export const userRoutes = (app: App) =>
         );
         return { ok: true };
       })
-      .post("/onboarding/complete", async ({ body, set, requireAuth }) => {
+      .post("/onboarding/complete", async ({ request, set, requireAuth }) => {
         const userId = requireAuth();
+
+        let body: unknown = {};
+        try {
+          if (request.body) {
+            body = await request.json();
+          }
+        } catch (error) {
+          // no need for logging parsing errors for empty body is not necessary
+        }
+
         const parsed = z
           .object({ budgets: BudgetsSchema.optional() })
           .safeParse(body ?? {});
