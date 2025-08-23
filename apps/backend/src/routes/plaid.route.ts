@@ -1,10 +1,12 @@
 import { Elysia } from "elysia";
 import {
   createLinkToken,
+  disconnectPlaidItem,
   exchangePublicToken,
   getAccounts,
   getTransactions,
   getUserPlaidStatus,
+  sandboxFireTransactionsWebhook,
 } from "../services/plaid.service";
 import {
   ExchangePublicTokenSchema,
@@ -12,8 +14,8 @@ import {
   TransactionsQuerySchema,
 } from "../schemas/plaid.schema";
 import type { App } from "../app";
-import { getDb } from "@backend/services/mongo.service";
-import { type Transaction } from "@backend/schemas/transaction.schema";
+import { getDb } from "../services/mongo.service";
+import type { Transaction } from "../schemas/transaction.schema";
 
 export const plaidRoutes = (app: App) =>
   app.group("/api/plaid", (group) =>
@@ -35,6 +37,15 @@ export const plaidRoutes = (app: App) =>
           publicToken: parsed.data.publicToken,
         });
         return res;
+      })
+      .post("/disconnect", async ({ requireAuth }) => {
+        const userId = requireAuth();
+        return await disconnectPlaidItem({ userId });
+      })
+      .post("/sandbox/fireWebhook", async ({ requireAuth }) => {
+        const userId = requireAuth();
+        const result = await sandboxFireTransactionsWebhook({ userId });
+        return result;
       })
       .get("/transactions", async ({ query, set, requireAuth }) => {
         const userId = requireAuth();
@@ -82,7 +93,7 @@ export const plaidRoutes = (app: App) =>
               paymentChannel: "manual",
               category: ["Manual", "Custom"],
               isoCurrencyCode: t.isoCurrencyCode || "USD",
-              pending: false,
+              status: "pending" as const,
             }));
 
             await transactionsCollection.insertMany(documents as any);

@@ -24,7 +24,8 @@ apps
 │   │   │   └── user.schema.ts
 │   │   └── services
 │   │       ├── mongo.service.ts
-│   │       └── plaid.service.ts
+│   │       ├── plaid.service.ts
+│   │       └── transaction.service.ts
 │   └── tsconfig.json
 └── frontend
     ├── README.md
@@ -199,6 +200,7 @@ const envSchema = z.object({
   PLAID_CLIENT_ID: z.string().optional(),
   PLAID_SECRET: z.string().optional(),
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).optional(),
+  BACKEND_PUBLIC_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse({
@@ -210,6 +212,7 @@ export const env = envSchema.parse({
   PLAID_CLIENT_ID: process.env.PLAID_CLIENT_ID,
   PLAID_SECRET: process.env.PLAID_SECRET,
   PLAID_ENV: process.env.PLAID_ENV,
+  BACKEND_PUBLIC_URL: process.env.BACKEND_PUBLIC_URL,
 });
 
 ```
@@ -521,7 +524,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
                       paymentChannel: tx.payment_channel,
                       category: tx.category || undefined,
                       isoCurrencyCode: tx.iso_currency_code,
-                      pending: tx.pending,
+                      status: tx.pending ? "pending" : "cleared",
                     },
                   },
                   upsert: true,
@@ -530,7 +533,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
             );
 
             if (upsertOperations.length > 0) {
-              await transactionsCollection.bulkWrite(upsertOperations);
+              await transactionsCollection.bulkWrite(upsertOperations as any);
               console.log(`Synced ${upsertOperations.length} transactions.`);
             }
 
@@ -574,11 +577,11 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
 import { Elysia } from "elysia";
 import {
   createLinkToken,
+  disconnectPlaidItem,
   exchangePublicToken,
   getAccounts,
   getTransactions,
   getUserPlaidStatus,
-  sandboxCreateTransactions,
   sandboxFireTransactionsWebhook,
 } from "../services/plaid.service";
 import {
@@ -587,6 +590,8 @@ import {
   TransactionsQuerySchema,
 } from "../schemas/plaid.schema";
 import type { App } from "../app";
+import { getDb } from "../services/mongo.service";
+import type { Transaction } from "../schemas/transaction.schema";
 
 export const plaidRoutes = (app: App) =>
   app.group("/api/plaid", (group) =>
@@ -608,6 +613,15 @@ export const plaidRoutes = (app: App) =>
           publicToken: parsed.data.publicToken,
         });
         return res;
+      })
+      .post("/disconnect", async ({ requireAuth }) => {
+        const userId = requireAuth();
+        return await disconnectPlaidItem({ userId });
+      })
+      .post("/sandbox/fireWebhook", async ({ requireAuth }) => {
+        const userId = requireAuth();
+        const result = await sandboxFireTransactionsWebhook({ userId });
+        return result;
       })
       .get("/transactions", async ({ query, set, requireAuth }) => {
         const userId = requireAuth();
@@ -636,16 +650,39 @@ export const plaidRoutes = (app: App) =>
             return { ok: false, error: "Invalid body" };
           }
 
-          const res = await sandboxCreateTransactions({
-            userId: userId,
-            transactions: parsed.data.transactions,
-          });
-          if ("error" in res) {
-            set.status = 400;
-            return { ok: false, error: res.error };
-          }
+          const { transactions } = parsed.data;
 
-          return { ok: true };
+          try {
+            const db = getDb();
+            const transactionsCollection =
+              db.collection<Transaction>("transactions");
+
+            const documents = transactions.map((t) => ({
+              clerkId: userId,
+              plaidTransactionId: `manual-tx-${Date.now()}-${Math.random()
+                .toString(36)
+                .substring(2, 9)}`,
+              plaidAccountId: "manual-account",
+              amount: t.amount,
+              date: t.datePosted,
+              name: t.description,
+              paymentChannel: "manual",
+              category: ["Manual", "Custom"],
+              isoCurrencyCode: t.isoCurrencyCode || "USD",
+              status: "pending" as const,
+            }));
+
+            await transactionsCollection.insertMany(documents as any);
+            console.log(
+              `Successfully created ${documents.length} manual transactions.`
+            );
+
+            return { ok: true };
+          } catch (error) {
+            console.error("Error creating manual transactions:", error);
+            set.status = 500;
+            return { ok: false, error: "Internal server error" };
+          }
         }
       )
       .get("/status", async ({ requireAuth }) => {
@@ -658,18 +695,6 @@ export const plaidRoutes = (app: App) =>
         const result = await getAccounts({ userId });
         return result;
       })
-      .post(
-        "/sandbox/fireTransactionsWebhook",
-        async ({ set, requireAuth }) => {
-          const userId = requireAuth();
-          const res = await sandboxFireTransactionsWebhook({ userId });
-          if ("error" in res) {
-            set.status = 400;
-            return { ok: false, error: res.error };
-          }
-          return { ok: res.ok };
-        }
-      )
   );
 
 ```
@@ -754,7 +779,7 @@ export const transactionSchema = z.object({
   paymentChannel: z.string(),
   category: z.array(z.string()).optional(),
   isoCurrencyCode: z.string().nullable(),
-  pending: z.boolean(),
+  status: z.enum(["pending", "cleared"]).default("pending"),
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;
@@ -864,6 +889,7 @@ import {
 import { getDb } from "./mongo.service";
 import type { User } from "@backend/schemas/user.schema";
 import type { Transaction } from "@backend/schemas/transaction.schema";
+import { env } from "@backend/config";
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = process.env.PLAID_SECRET || "";
@@ -883,12 +909,21 @@ const plaid = new PlaidApi(
 );
 
 export async function createLinkToken({ userId }: { userId: string }) {
+  const webhookUrl = env.BACKEND_PUBLIC_URL
+    ? `${env.BACKEND_PUBLIC_URL}/webhook/plaid`
+    : undefined;
+
+  if (webhookUrl) {
+    console.log(`Configuring Plaid Link with webhook URL: ${webhookUrl}`);
+  }
+
   const { data } = await plaid.linkTokenCreate({
     user: { client_user_id: userId },
     client_name: "Karma",
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: "en",
+    webhook: webhookUrl,
   });
 
   return { linkToken: data.link_token };
@@ -909,13 +944,15 @@ export async function exchangePublicToken({
   const usersCollection = db.collection<User>("users");
   const transactionsCollection = db.collection<Transaction>("transactions");
 
-  // --- Start of New Logic: Initial Transaction Sync ---
+  console.log(
+    `Clearing any existing transactions for user ${userId} before sync`
+  );
+  await transactionsCollection.deleteMany({ clerkId: userId });
 
   let cursor: string | undefined = undefined;
   let added: PlaidTransaction[] = [];
   let hasMore = true;
 
-  // Iterate through each page of new transaction updates for item
   while (hasMore) {
     const request = {
       access_token: data.access_token,
@@ -928,7 +965,6 @@ export async function exchangePublicToken({
     cursor = newData.next_cursor;
   }
 
-  // Save initial transactions to the database
   if (added.length > 0) {
     const initialTransactions = added.map((tx) => ({
       clerkId: userId,
@@ -940,15 +976,13 @@ export async function exchangePublicToken({
       paymentChannel: tx.payment_channel,
       category: tx.category || undefined,
       isoCurrencyCode: tx.iso_currency_code,
-      pending: tx.pending,
+      status: tx.pending ? ("pending" as const) : ("cleared" as const),
     }));
     await transactionsCollection.insertMany(initialTransactions as any);
     console.log(
       `Pulled ${added.length} initial transactions for user ${userId}.`
     );
   }
-
-  // --- End of New Logic ---
 
   await usersCollection.updateOne(
     { clerkId: userId },
@@ -957,7 +991,7 @@ export async function exchangePublicToken({
         plaidAccessToken: data.access_token,
         plaidItemId: data.item_id,
         plaidConnectedAt: new Date(),
-        plaidTransactionsCursor: cursor, // Save the latest cursor
+        plaidTransactionsCursor: cursor,
         updatedAt: new Date(),
       },
     }
@@ -979,12 +1013,28 @@ export async function getTransactions({
   const db = getDb();
   const transactionsCollection = db.collection<Transaction>("transactions");
 
+  const today = new Date().toISOString().slice(0, 10);
+  const result = await transactionsCollection.updateMany(
+    { clerkId: userId, status: "pending", date: { $lte: today } },
+    { $set: { status: "cleared" } }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(`Cleared ${result.modifiedCount} pending transactions.`);
+  }
+
+  const query: Record<string, any> = { clerkId: userId };
+  if (startDate) {
+    query.date = { ...query.date, $gte: startDate };
+  }
+  if (endDate) {
+    query.date = { ...query.date, $lte: endDate };
+  }
+
   const userTransactions = await transactionsCollection
-    .find({ clerkId: userId })
+    .find(query)
     .sort({ date: -1 })
     .toArray();
-
-  console.log(`Found ${userTransactions.length} transactions in DB for user.`);
 
   return {
     transactions: userTransactions.map((tx) => ({
@@ -996,56 +1046,9 @@ export async function getTransactions({
       payment_channel: tx.paymentChannel,
       category: tx.category,
       iso_currency_code: tx.isoCurrencyCode,
-      pending: tx.pending,
+      status: tx.status,
     })),
   };
-}
-
-export async function sandboxCreateTransactions({
-  userId,
-  transactions,
-}: {
-  userId: string;
-  transactions: {
-    amount: number;
-    datePosted: string;
-    dateTransacted: string;
-    description: string;
-    isoCurrencyCode?: string;
-  }[];
-}) {
-  const db = getDb();
-  const usersCollection = db.collection<User>("users");
-  const user = await usersCollection.findOne({ clerkId: userId });
-
-  if (!user?.plaidAccessToken) {
-    return { error: "No accessToken. Link account first." as const };
-  }
-
-  console.log("Creating sandbox transactions:", transactions);
-  console.log("User access token exists:", !!user.plaidAccessToken);
-
-  try {
-    const result = await plaid.sandboxTransactionsCreate({
-      access_token: user.plaidAccessToken,
-      transactions: transactions.map((t) => ({
-        amount: t.amount,
-        date_posted: t.datePosted,
-        date_transacted: t.dateTransacted,
-        description: t.description,
-        iso_currency_code: t.isoCurrencyCode,
-      })),
-    });
-
-    await sandboxFireTransactionsWebhook({ userId });
-    console.log("Fired SYNC_UPDATES_AVAILABLE webhook");
-
-    // console.log("Sandbox transactions created successfully:", result);
-    return { ok: true };
-  } catch (error) {
-    console.error("Error creating sandbox transactions:", error);
-    throw error;
-  }
 }
 
 export async function getUserPlaidStatus({ userId }: { userId: string }) {
@@ -1114,6 +1117,148 @@ export async function sandboxFireTransactionsWebhook({
 
   return { ok: data.webhook_fired === true };
 }
+
+export async function disconnectPlaidItem({ userId }: { userId: string }) {
+  const db = getDb();
+  const usersCollection = db.collection<User>("users");
+  const transactionsCollection = db.collection<Transaction>("transactions");
+
+  const user = await usersCollection.findOne({ clerkId: userId });
+
+  if (!user || !user.plaidAccessToken) {
+    return { ok: true, message: "No Plaid connection to disconnect." };
+  }
+
+  try {
+    await plaid.itemRemove({
+      access_token: user.plaidAccessToken,
+    });
+  } catch (error) {
+    console.error(
+      `Could not invalidate Plaid access token for user ${userId}:`,
+      error
+    );
+  }
+
+  await usersCollection.updateOne(
+    {
+      clerkId: userId,
+    },
+    {
+      $unset: {
+        plaidAccessToken: "",
+        plaidItemId: "",
+        plaidConnectedAt: "",
+        plaidTransactionsCursor: "",
+      },
+      $set: {
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  const { deletedCount } = await transactionsCollection.deleteMany({
+    clerkId: userId,
+  });
+
+  console.log(
+    `Disconnected Plaid for user ${userId}. Removed ${deletedCount} transactions.`
+  );
+
+  return { ok: true };
+}
+
+```
+
+`apps/backend/src/services/transaction.service.ts`:
+
+```ts
+import { getDb } from "./mongo.service";
+import type { Transaction } from "@backend/schemas/transaction.schema";
+import { ObjectId } from "mongodb";
+
+const daysAgo = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+};
+
+export const seedInitialTransactions = async (clerkId: string) => {
+  try {
+    const db = await getDb();
+    const transactionsCollection = db.collection<Transaction>("transactions");
+
+    const transactions: Omit<Transaction, "_id">[] = [
+      {
+        clerkId,
+        plaidTransactionId: `tx-${new ObjectId()}`,
+        plaidAccountId: "account-checking-01",
+        amount: 12.75,
+        date: daysAgo(1),
+        name: "Uber Eats",
+        paymentChannel: "online",
+        category: ["Food and Drink", "Restaurants", "Delivery"],
+        isoCurrencyCode: "USD",
+        status: "pending",
+      },
+      {
+        clerkId,
+        plaidTransactionId: `tx-${new ObjectId()}`,
+        plaidAccountId: "account-checking-01",
+        amount: 7.21,
+        date: daysAgo(2),
+        name: "Starbucks",
+        paymentChannel: "in store",
+        category: ["Food and Drink", "Restaurants", "Coffee Shop"],
+        isoCurrencyCode: "USD",
+        status: "cleared",
+      },
+      {
+        clerkId,
+        plaidTransactionId: `tx-${new ObjectId()}`,
+        plaidAccountId: "account-checking-01",
+        amount: 89.5,
+        date: daysAgo(3),
+        name: "Amazon.com*Purchase",
+        paymentChannel: "online",
+        category: ["Shops", "Digital Purchase"],
+        isoCurrencyCode: "USD",
+        status: "cleared",
+      },
+      {
+        clerkId,
+        plaidTransactionId: `tx-${new ObjectId()}`,
+        plaidAccountId: "account-checking-01",
+        amount: -3200.0,
+        date: daysAgo(8),
+        name: "PAYROLL DEPOSIT - ACME INC",
+        paymentChannel: "other",
+        category: ["Transfer", "Deposit", "Payroll"],
+        isoCurrencyCode: "USD",
+        status: "cleared",
+      },
+      {
+        clerkId,
+        plaidTransactionId: `tx-${new ObjectId()}`,
+        plaidAccountId: "account-checking-01",
+        amount: 1850.0,
+        date: daysAgo(22),
+        name: "Zelle Transfer to Landlord",
+        paymentChannel: "online",
+        category: ["Transfer", "Payment", "Rent"],
+        isoCurrencyCode: "USD",
+        status: "cleared",
+      },
+    ];
+
+    await transactionsCollection.insertMany(transactions as any[]);
+    console.log(
+      `Seeded ${transactions.length} initial transactions for user ${clerkId}.`
+    );
+  } catch (error) {
+    console.error(`Failed to seed transactions for user ${clerkId}:`, error);
+  }
+};
 
 ```
 
@@ -1366,7 +1511,6 @@ export function usePlaid() {
   const { getToken, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
 
-  // Query for Plaid status
   const {
     data: statusData,
     isLoading: checkingStatus,
@@ -1387,7 +1531,6 @@ export function usePlaid() {
 
   const isConnected = statusData?.isConnected || false;
 
-  // Query for link token (only when not connected)
   const { data: linkTokenData, isLoading: linkTokenLoading } = useQuery({
     queryKey: ["plaid", "linkToken"],
     queryFn: async () => {
@@ -1402,7 +1545,6 @@ export function usePlaid() {
     enabled: isSignedIn && !isConnected && !checkingStatus,
   });
 
-  // Query for transactions (only when connected)
   const {
     data: transactionsData,
     isLoading: transactionsLoading,
@@ -1421,7 +1563,22 @@ export function usePlaid() {
     enabled: isSignedIn && isConnected,
   });
 
-  // Mutation for exchanging public token
+  const fireWebhookMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+      return eden.api.plaid.sandbox.fireWebhook.post(undefined, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => {
+      console.log("Sandbox webhook fired. Fetching transactions in 2.5s...");
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
+      }, 2500);
+    },
+  });
+
   const exchangeTokenMutation = useMutation({
     mutationFn: async (publicToken: string) => {
       const token = await getToken();
@@ -1433,9 +1590,8 @@ export function usePlaid() {
       );
     },
     onSuccess: () => {
-      // Invalidate and refetch status and transactions
       queryClient.invalidateQueries({ queryKey: ["plaid", "status"] });
-      queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
+      fireWebhookMutation.mutate();
     },
   });
 
@@ -1447,8 +1603,23 @@ export function usePlaid() {
   );
 
   const refreshTransactions = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
     refetchTransactions();
-  }, [refetchTransactions]);
+  }, [refetchTransactions, queryClient]);
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      return eden.api.plaid.disconnect.post(undefined, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plaid"] });
+    },
+  });
 
   return {
     linkToken: linkTokenData?.linkToken || null,
@@ -1459,6 +1630,8 @@ export function usePlaid() {
     transactionsLoading,
     onLinkSuccess,
     refreshTransactions,
+    disconnect: disconnectMutation.mutate,
+    isDisconnecting: disconnectMutation.isPending,
   };
 }
 
@@ -1734,7 +1907,6 @@ export function useAdminTransactions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
-      queryClient.refetchQueries({ queryKey: ["plaid", "transactions"] });
       setRows([newRow()]);
     },
   });
@@ -1893,6 +2065,7 @@ import { usePlaid } from "@/app/(app)/_hooks/use-plaid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { eden } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const {
@@ -1904,6 +2077,8 @@ export default function Home() {
     transactionsLoading,
     onLinkSuccess,
     refreshTransactions,
+    disconnect,
+    isDisconnecting,
   } = usePlaid();
   const { getToken } = useAuth();
 
@@ -1949,45 +2124,21 @@ export default function Home() {
           </button>
         )}
         {isConnected && (
-          <button
-            className="rounded-md border px-4 py-2"
-            onClick={() => refreshTransactions()}
-          >
-            Refresh transactions
-          </button>
-        )}
-        {isConnected && (
-          <button
-            className="rounded-md bg-red-600 text-white px-4 py-2 text-sm"
-            onClick={async () => {
-              const token = await getToken();
-              if (!token) return;
-
-              // Check accounts first
-              const accounts = await eden.api.plaid.accounts.get({
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              console.log("Accounts:", accounts);
-
-              // Then check transactions with explicit date range
-              const today = new Date().toISOString().slice(0, 10);
-              const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                .toISOString()
-                .slice(0, 10);
-
-              const transactionsWithDates =
-                await eden.api.plaid.transactions.get({
-                  query: { startDate: "2023-01-01", endDate: futureDate },
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-              console.log(
-                "Transactions with wide date range:",
-                transactionsWithDates
-              );
-            }}
-          >
-            🐛 Debug Plaid
-          </button>
+          <>
+            <button
+              className="rounded-md border px-4 py-2"
+              onClick={() => refreshTransactions()}
+            >
+              Refresh transactions
+            </button>
+            <button
+              className="rounded-md border border-red-500/50 bg-red-50 px-4 py-2 text-red-700 hover:bg-red-100 disabled:opacity-50"
+              onClick={() => disconnect()}
+              disabled={isDisconnecting}
+            > 
+              {isDisconnecting ? "Disconnecting..." : "Disconnect Account"}
+            </button>
+          </>
         )}
       </div>
 
@@ -2024,21 +2175,37 @@ export default function Home() {
         <div className="w-full max-w-2xl">
           <h2 className="text-xl font-medium mb-2">Recent transactions</h2>
           <ul className="divide-y rounded-md border">
-            {transactions.map((tx: any) => (
-              <li key={tx.transaction_id} className="p-3 flex justify-between">
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {tx.name || tx.merchant_name || "Transaction"}
+            {transactions.map((tx: any) => {
+              const isPending = tx.status === "pending";
+              const displayAmount = -tx.amount;
+              const amountColor =
+                displayAmount > 0 ? "text-green-600" : "text-red-600";
+
+              return (
+                <li
+                  key={tx.transaction_id}
+                  className={cn(
+                    "p-3 flex justify-between items-center",
+                    isPending && "opacity-60"
+                  )}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {tx.name || "Transaction"}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {tx.date} {isPending && "(Pending)"}
+                    </span>
+                  </div>
+                  <span className={cn("font-mono font-semibold", amountColor)}>
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: tx.iso_currency_code || "USD",
+                    }).format(displayAmount)}
                   </span>
-                  <span className="text-sm text-gray-500">{tx.date}</span>
-                </div>
-                <span className="font-mono">
-                  {typeof tx.amount === "number"
-                    ? `$${tx.amount.toFixed(2)}`
-                    : "--"}
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

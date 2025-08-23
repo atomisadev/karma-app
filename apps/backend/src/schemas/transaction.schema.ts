@@ -12,7 +12,7 @@ export const transactionSchema = z.object({
   paymentChannel: z.string(),
   category: z.array(z.string()).optional(),
   isoCurrencyCode: z.string().nullable(),
-  pending: z.boolean(),
+  status: z.enum(["pending", "cleared"]).default("pending"),
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;

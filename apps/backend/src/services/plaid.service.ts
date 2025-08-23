@@ -11,6 +11,13 @@ import {
 import { getDb } from "./mongo.service";
 import type { User } from "@backend/schemas/user.schema";
 import type { Transaction } from "@backend/schemas/transaction.schema";
+import { env } from "@backend/config";
+
+const daysAgo = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+};
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = process.env.PLAID_SECRET || "";
@@ -30,12 +37,21 @@ const plaid = new PlaidApi(
 );
 
 export async function createLinkToken({ userId }: { userId: string }) {
+  const webhookUrl = env.BACKEND_PUBLIC_URL
+    ? `${env.BACKEND_PUBLIC_URL}/webhook/plaid`
+    : undefined;
+
+  if (webhookUrl) {
+    console.log(`Configuring Plaid Link with webhook URL: ${webhookUrl}`);
+  }
+
   const { data } = await plaid.linkTokenCreate({
     user: { client_user_id: userId },
     client_name: "Karma",
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: "en",
+    webhook: webhookUrl,
   });
 
   return { linkToken: data.link_token };
@@ -55,6 +71,11 @@ export async function exchangePublicToken({
   const db = getDb();
   const usersCollection = db.collection<User>("users");
   const transactionsCollection = db.collection<Transaction>("transactions");
+
+  console.log(
+    `Clearing any existing transactions for user ${userId} before sync`
+  );
+  await transactionsCollection.deleteMany({ clerkId: userId });
 
   let cursor: string | undefined = undefined;
   let added: PlaidTransaction[] = [];
@@ -83,7 +104,7 @@ export async function exchangePublicToken({
       paymentChannel: tx.payment_channel,
       category: tx.category || undefined,
       isoCurrencyCode: tx.iso_currency_code,
-      pending: tx.pending,
+      status: tx.pending ? ("pending" as const) : ("cleared" as const),
     }));
     await transactionsCollection.insertMany(initialTransactions as any);
     console.log(
@@ -120,6 +141,16 @@ export async function getTransactions({
   const db = getDb();
   const transactionsCollection = db.collection<Transaction>("transactions");
 
+  const clearedDate = daysAgo(2);
+  const result = await transactionsCollection.updateMany(
+    { clerkId: userId, status: "pending", date: { $lte: clearedDate } },
+    { $set: { status: "cleared" } }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(`Cleared ${result.modifiedCount} pending transactions.`);
+  }
+
   const query: Record<string, any> = { clerkId: userId };
   if (startDate) {
     query.date = { ...query.date, $gte: startDate };
@@ -143,7 +174,7 @@ export async function getTransactions({
       payment_channel: tx.paymentChannel,
       category: tx.category,
       iso_currency_code: tx.isoCurrencyCode,
-      pending: tx.pending,
+      status: tx.status,
     })),
   };
 }
@@ -213,4 +244,54 @@ export async function sandboxFireTransactionsWebhook({
   });
 
   return { ok: data.webhook_fired === true };
+}
+
+export async function disconnectPlaidItem({ userId }: { userId: string }) {
+  const db = getDb();
+  const usersCollection = db.collection<User>("users");
+  const transactionsCollection = db.collection<Transaction>("transactions");
+
+  const user = await usersCollection.findOne({ clerkId: userId });
+
+  if (!user || !user.plaidAccessToken) {
+    return { ok: true, message: "No Plaid connection to disconnect." };
+  }
+
+  try {
+    await plaid.itemRemove({
+      access_token: user.plaidAccessToken,
+    });
+  } catch (error) {
+    console.error(
+      `Could not invalidate Plaid access token for user ${userId}:`,
+      error
+    );
+  }
+
+  await usersCollection.updateOne(
+    {
+      clerkId: userId,
+    },
+    {
+      $unset: {
+        plaidAccessToken: "",
+        plaidItemId: "",
+        plaidConnectedAt: "",
+        plaidTransactionsCursor: "",
+      },
+      $set: {
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  const { deletedCount } = await transactionsCollection.deleteMany({
+    clerkId: userId,
+  });
+
+  console.log(
+    `Disconnected Plaid for user ${userId}. Removed ${deletedCount} transactions.`
+  );
+
+  return { ok: true };
 }

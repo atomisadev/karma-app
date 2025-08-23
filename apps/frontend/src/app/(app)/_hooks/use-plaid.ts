@@ -61,6 +61,22 @@ export function usePlaid() {
     enabled: isSignedIn && isConnected,
   });
 
+  const fireWebhookMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+      return eden.api.plaid.sandbox.fireWebhook.post(undefined, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => {
+      console.log("Sandbox webhook fired. Fetching transactions in 2.5s...");
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
+      }, 2500);
+    },
+  });
+
   const exchangeTokenMutation = useMutation({
     mutationFn: async (publicToken: string) => {
       const token = await getToken();
@@ -73,7 +89,7 @@ export function usePlaid() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plaid", "status"] });
-      queryClient.invalidateQueries({ queryKey: ["plaid", "transactions"] });
+      fireWebhookMutation.mutate();
     },
   });
 
@@ -89,6 +105,20 @@ export function usePlaid() {
     refetchTransactions();
   }, [refetchTransactions, queryClient]);
 
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      return eden.api.plaid.disconnect.post(undefined, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plaid"] });
+    },
+  });
+
   return {
     linkToken: linkTokenData?.linkToken || null,
     transactions: transactionsData?.transactions || [],
@@ -98,5 +128,7 @@ export function usePlaid() {
     transactionsLoading,
     onLinkSuccess,
     refreshTransactions,
+    disconnect: disconnectMutation.mutate,
+    isDisconnecting: disconnectMutation.isPending,
   };
 }

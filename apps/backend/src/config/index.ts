@@ -9,6 +9,7 @@ const envSchema = z.object({
   PLAID_CLIENT_ID: z.string().optional(),
   PLAID_SECRET: z.string().optional(),
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).optional(),
+  BACKEND_PUBLIC_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse({
@@ -20,4 +21,5 @@ export const env = envSchema.parse({
   PLAID_CLIENT_ID: process.env.PLAID_CLIENT_ID,
   PLAID_SECRET: process.env.PLAID_SECRET,
   PLAID_ENV: process.env.PLAID_ENV,
+  BACKEND_PUBLIC_URL: process.env.BACKEND_PUBLIC_URL,
 });

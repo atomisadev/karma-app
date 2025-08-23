@@ -6,6 +6,7 @@ import { usePlaid } from "@/app/(app)/_hooks/use-plaid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { eden } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const {
@@ -17,6 +18,8 @@ export default function Home() {
     transactionsLoading,
     onLinkSuccess,
     refreshTransactions,
+    disconnect,
+    isDisconnecting,
   } = usePlaid();
   const { getToken } = useAuth();
 
@@ -62,12 +65,21 @@ export default function Home() {
           </button>
         )}
         {isConnected && (
-          <button
-            className="rounded-md border px-4 py-2"
-            onClick={() => refreshTransactions()}
-          >
-            Refresh transactions
-          </button>
+          <>
+            <button
+              className="rounded-md border px-4 py-2"
+              onClick={() => refreshTransactions()}
+            >
+              Refresh transactions
+            </button>
+            <button
+              className="rounded-md border border-red-500/50 bg-red-50 px-4 py-2 text-red-700 hover:bg-red-100 disabled:opacity-50"
+              onClick={() => disconnect()}
+              disabled={isDisconnecting}
+            > 
+              {isDisconnecting ? "Disconnecting..." : "Disconnect Account"}
+            </button>
+          </>
         )}
       </div>
 
@@ -104,21 +116,37 @@ export default function Home() {
         <div className="w-full max-w-2xl">
           <h2 className="text-xl font-medium mb-2">Recent transactions</h2>
           <ul className="divide-y rounded-md border">
-            {transactions.map((tx: any) => (
-              <li key={tx.transaction_id} className="p-3 flex justify-between">
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {tx.name || tx.merchant_name || "Transaction"}
+            {transactions.map((tx: any) => {
+              const isPending = tx.status === "pending";
+              const displayAmount = -tx.amount;
+              const amountColor =
+                displayAmount > 0 ? "text-green-600" : "text-red-600";
+
+              return (
+                <li
+                  key={tx.transaction_id}
+                  className={cn(
+                    "p-3 flex justify-between items-center",
+                    isPending && "opacity-60"
+                  )}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {tx.name || "Transaction"}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {tx.date} {isPending && "(Pending)"}
+                    </span>
+                  </div>
+                  <span className={cn("font-mono font-semibold", amountColor)}>
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: tx.iso_currency_code || "USD",
+                    }).format(displayAmount)}
                   </span>
-                  <span className="text-sm text-gray-500">{tx.date}</span>
-                </div>
-                <span className="font-mono">
-                  {typeof tx.amount === "number"
-                    ? `$${tx.amount.toFixed(2)}`
-                    : "--"}
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

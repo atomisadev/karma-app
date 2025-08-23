@@ -79,7 +79,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
                       paymentChannel: tx.payment_channel,
                       category: tx.category || undefined,
                       isoCurrencyCode: tx.iso_currency_code,
-                      pending: tx.pending,
+                      status: tx.pending ? "pending" : "cleared",
                     },
                   },
                   upsert: true,
@@ -88,7 +88,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
             );
 
             if (upsertOperations.length > 0) {
-              await transactionsCollection.bulkWrite(upsertOperations);
+              await transactionsCollection.bulkWrite(upsertOperations as any);
               console.log(`Synced ${upsertOperations.length} transactions.`);
             }
 
