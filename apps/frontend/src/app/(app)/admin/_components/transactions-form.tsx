@@ -31,7 +31,7 @@ export function TransactionsForm({
         <h2 className="text-xl font-semibold">Create Custom Transactions</h2>
         <div className="flex gap-2">
           <button
-            className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+            className="rounded-md border px-3 py-2 text-sm disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             onClick={() => addRow()}
             disabled={rows.length >= 10}
           >
@@ -47,35 +47,35 @@ export function TransactionsForm({
         </h3>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-md bg-amber-100 text-amber-800 px-3 py-1 text-sm hover:bg-amber-200"
+            className="rounded-md bg-amber-100 text-amber-800 px-3 py-1 text-sm hover:bg-amber-200 cursor-pointer"
             onClick={() => addPresetTransaction("coffee")}
             disabled={rows.length >= 10}
           >
             ☕ Coffee (-$4.50)
           </button>
           <button
-            className="rounded-md bg-green-100 text-green-800 px-3 py-1 text-sm hover:bg-green-200"
+            className="rounded-md bg-green-100 text-green-800 px-3 py-1 text-sm hover:bg-green-200 cursor-pointer"
             onClick={() => addPresetTransaction("grocery")}
             disabled={rows.length >= 10}
           >
             🛒 Grocery (-$75.30)
           </button>
           <button
-            className="rounded-md bg-blue-100 text-blue-800 px-3 py-1 text-sm hover:bg-blue-200"
+            className="rounded-md bg-blue-100 text-blue-800 px-3 py-1 text-sm hover:bg-blue-200 cursor-pointer"
             onClick={() => addPresetTransaction("gas")}
             disabled={rows.length >= 10}
           >
             ⛽ Gas (-$45.00)
           </button>
           <button
-            className="rounded-md bg-purple-100 text-purple-800 px-3 py-1 text-sm hover:bg-purple-200"
+            className="rounded-md bg-purple-100 text-purple-800 px-3 py-1 text-sm hover:bg-purple-200 cursor-pointer"
             onClick={() => addPresetTransaction("restaurant")}
             disabled={rows.length >= 10}
           >
             🍽️ Restaurant (-$28.75)
           </button>
           <button
-            className="rounded-md bg-emerald-100 text-emerald-800 px-3 py-1 text-sm hover:bg-emerald-200"
+            className="rounded-md bg-emerald-100 text-emerald-800 px-3 py-1 text-sm hover:bg-emerald-200 cursor-pointer"
             onClick={() => addPresetTransaction("income")}
             disabled={rows.length >= 10}
           >
@@ -155,7 +155,7 @@ export function TransactionsForm({
                 </td>
                 <td className="p-3">
                   <button
-                    className="rounded-md border px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    className="rounded-md border px-2 py-1 text-xs text-red-600 hover:bg-red-50 cursor-pointer"
                     onClick={() => removeRow(i)}
                     disabled={rows.length <= 1}
                   >
@@ -185,7 +185,7 @@ export function TransactionsForm({
 
       <div className="flex gap-3">
         <button
-          className="rounded-md bg-black text-white px-6 py-2 disabled:opacity-50"
+          className="rounded-md bg-black text-white px-6 py-2 disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
           onClick={() => submit()}
           disabled={
             loading ||
@@ -193,13 +193,18 @@ export function TransactionsForm({
             rows.every((r) => !r.description.trim())
           }
         >
-          {loading
-            ? "Creating..."
-            : `Create ${rows.length} Transaction${rows.length !== 1 ? "s" : ""}`}
+          {loading && (
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          )}
+          <span>
+            {loading
+              ? "Creating..."
+              : `Create ${rows.length} Transaction${rows.length !== 1 ? "s" : ""}`}
+          </span>
         </button>
 
         <button
-          className="rounded-md border px-4 py-2 text-gray-600"
+          className="rounded-md border px-4 py-2 text-gray-600 cursor-pointer"
           onClick={() => (window.location.href = "/")}
         >
           ← Back to Transactions
