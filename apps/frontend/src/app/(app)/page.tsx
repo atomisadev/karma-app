@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { usePlaidLink } from "react-plaid-link";
-import { usePlaid } from "@/app/_hooks/use-plaid";
+import { usePlaid } from "@/app/(app)/_hooks/use-plaid";
 
 export default function Home() {
   const {

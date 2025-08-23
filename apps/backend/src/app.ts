@@ -3,6 +3,7 @@ import { cors } from "@elysiajs/cors";
 import { clerkPlugin } from "elysia-clerk";
 import type { ElysiaErrors } from "elysia/error";
 import { plaidRoutes } from "./routes/plaid.route";
+import { webhookRoutes } from "./routes/webhook.route";
 import { env } from "./config";
 
 export const app = new Elysia()
@@ -17,11 +18,15 @@ export const app = new Elysia()
         "accept",
         "origin",
         "x-requested-with",
+        "svix-id",
+        "svix-timestamp",
+        "svix-signature",
       ],
       exposeHeaders: ["authorization", "content-type", "accept", "origin"],
     })
   )
   .use(clerkPlugin())
+  .use(webhookRoutes)
   .derive((ctx) => ({
     requireAuth: () => {
       const { userId } = ctx.auth();
