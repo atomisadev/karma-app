@@ -10,11 +10,7 @@ export function usePlaid() {
   const queryClient = useQueryClient();
 
   // Query for Plaid status
-  const {
-    data: statusData,
-    isLoading: checkingStatus,
-    error: statusError,
-  } = useQuery({
+  const { data: statusData, isLoading: checkingStatus } = useQuery({
     queryKey: ["plaid", "status"],
     queryFn: async () => {
       const token = await getToken();
