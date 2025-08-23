@@ -2,18 +2,16 @@
 
 import { useMemo, useState } from "react";
 
-// Simple half-arc gauge (300–850). No needle; just a thick semi-circle with a gradient
-// and a circular knob at the current value (like your reference image).
 export type ScoreProps = {
   score?: number; // 300–850
-  size?: number; // overall width in px
+  size?: number; 
 };
 
 const MIN_SCORE = 300;
 const MAX_SCORE = 850;
-const SWEEP_DEG = 180; // half-arc
-const START_ANGLE = -180; // left
-const END_ANGLE = 0; // right
+const SWEEP_DEG = 180; 
+const START_ANGLE = -180;
+const END_ANGLE = 0; 
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -43,35 +41,30 @@ export default function Score({
   const ratio = scoreToRatio(s);
   const angle = START_ANGLE + ratio * SWEEP_DEG;
 
-  // Geometry sized to perfectly fit a semicircle inside the svg without overflow
   const thickness = 26;
-  const w = size; // total width
-  const r = (w - thickness) / 3; // radius so stroke stays inside width
+  const w = size; 
+  const r = (w - thickness) / 3;
   const cx = w / 2;
-  const cy = r + thickness / 2; // center sits at the bottom of the half-arc
-  const h = r + thickness; // svg height needed to contain the arc + stroke
+  const cy = r + thickness / 2;
+  const h = r + thickness;
 
-  // Paths
   const trackPath = useMemo(() => arcPath(cx, cy, r, START_ANGLE, END_ANGLE), [cx, cy, r]);
   const progressPath = useMemo(() => arcPath(cx, cy, r, START_ANGLE, angle), [cx, cy, r, angle]);
 
-  // Knob position at the current angle
   const knob = polarToCartesian(cx, cy, r, angle);
   const knobR = Math.max(10, thickness * 0.6);
 
   return (
     <div className="w-full flex flex-col items-center gap-6 p-6">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
-        {/* Background track */}
         <path
           d={trackPath}
           fill="none"
-          stroke="#e5e7eb"
+          stroke="#e5e7eb6a"
           strokeWidth={thickness}
           strokeLinecap="round"
         />
 
-        {/* Progress arc */}
         <path
           d={progressPath}
           fill="none"
@@ -80,7 +73,6 @@ export default function Score({
           strokeLinecap="round"
         />
 
-        {/* Knob at end of progress */}
         <g>
           <circle
             cx={knob.x}
@@ -99,10 +91,9 @@ export default function Score({
           />
         </g>
 
-        {/* Score text inside arc */}
         <text
           x={cx}
-          y={cy - r / 4} // lower down compared to before
+          y={cy - r / 4}
           textAnchor="middle"
           dominantBaseline="middle"
           fontSize={48}
@@ -113,7 +104,7 @@ export default function Score({
         </text>
         <text
           x={cx}
-          y={cy - r / 4 + 32} // label just below score
+          y={cy - r / 4 + 32} 
           textAnchor="middle"
           dominantBaseline="middle"
           fontSize={14}
@@ -122,7 +113,6 @@ export default function Score({
           {MIN_SCORE}–{MAX_SCORE}
         </text>
 
-        {/* Gradient left (300/red) → right (850/green) */}
         <defs>
           <linearGradient
             id="progressGradient"
