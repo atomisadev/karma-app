@@ -233,7 +233,7 @@ export default function Home() {
         {!!transactions?.length && !transactionsLoading && (
           <div className="w-full max-w-2xl">
             <h2 className="text-xl font-medium mb-2">Recent transactions</h2>
-            <ul className="divide-y rounded-md border">
+            <ul className="divide-y rounded-md border overflow-scroll overflow-x-hidden h-[68vh]">
               {transactions.map((tx: any) => {
                 const isPending = tx.status === "pending";
                 const displayAmount = -tx.amount;
