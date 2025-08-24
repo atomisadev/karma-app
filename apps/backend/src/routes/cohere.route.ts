@@ -1,7 +1,7 @@
-import { getFinancialInsight } from "@backend/services/openai.service";
+import { getFinancialInsight } from "@backend/services/cohere.service";
 import type { App } from "../app";
 
-export const openaiRoutes = (app: App) =>
+export const cohereRoutes = (app: App) =>
   app.group("/api/openai", (group) =>
     group.post(
       "/insight",

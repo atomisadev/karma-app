@@ -8,7 +8,7 @@ import {
   getSuggestedChallenge,
   isIndulgence,
   doesTransactionViolateInstruction,
-} from "./openai.service";
+} from "./cohere.service";
 
 const KARMA_DECREMENT = 25;
 

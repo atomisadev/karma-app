@@ -8,23 +8,14 @@ import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import Score from "../../components/Score";
 import { useUserProfile } from "./_hooks/use-user";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMutation } from "@tanstack/react-query";
 import { eden } from "@/lib/api";
 import { toast } from "sonner";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FaRegTrashAlt } from "react-icons/fa";
 import { HiOutlineRefresh } from "react-icons/hi";
 
@@ -121,7 +112,14 @@ export default function Home() {
     onSuccess: (data) => {
       if (data && "insight" in data) {
         try {
-          const suggestedBudgets = JSON.parse(data.insight);
+          let jsonString = data.insight.trim();
+          if (jsonString.startsWith("```json")) {
+            jsonString = jsonString
+              .replace(/^```json\s*/, "")
+              .replace(/```$/, "");
+          }
+
+          const suggestedBudgets = JSON.parse(jsonString);
           setBudgets(suggestedBudgets);
           setHasChanges(true);
           toast.success("AI budget recommendations applied!");
@@ -192,10 +190,13 @@ export default function Home() {
       )}
       {!isConnected && (
         <div className="flex w-full justify-center items-center h-screen text-center">
-
           <Card className="w-full max-w-xl">
             <CardHeader>
-              <CardTitle><h1 className="text-2xl font-semibold text-center">Connect a bank and view transactions</h1></CardTitle>
+              <CardTitle>
+                <h1 className="text-2xl font-semibold text-center">
+                  Connect a bank and view transactions
+                </h1>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Button
@@ -222,8 +223,12 @@ export default function Home() {
               <Card className="w-full max-w-xl">
                 <CardContent>
                   <div className="mb-6">
-                    <p className="text-sm text-muted-foreground">Monthly Income</p>
-                    <p className="text-3xl font-bold">{formatCurrency(income30)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Monthly Income
+                    </p>
+                    <p className="text-3xl font-bold">
+                      {formatCurrency(income30)}
+                    </p>
                   </div>
                   <div>
                     <div className="flex justify-between items-center mb-4">
@@ -235,7 +240,9 @@ export default function Home() {
                           size="sm"
                         >
                           ✨{" "}
-                          {aiSuggestionMutation.isPending ? "Thinking..." : "Ask AI"}
+                          {aiSuggestionMutation.isPending
+                            ? "Thinking..."
+                            : "Ask AI"}
                         </Button>
                         <Button
                           onClick={handleSaveBudgets}
@@ -250,31 +257,37 @@ export default function Home() {
                     {/* ✅ scrollable budget categories */}
                     <ScrollArea className="h-50 pr-2">
                       <div className="space-y-3">
-                        {Object.entries(categoryTotals).map(([category, total]) => (
-                          <div key={category}>
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="font-medium">{category}</span>
-                              <Input
-                                type="number"
-                                value={budgets[category] ?? ""}
-                                onChange={(e) =>
-                                  handleBudgetChange(category, e.target.value)
-                                }
-                                className="w-28"
-                                placeholder="0.00"
-                              />
+                        {Object.entries(categoryTotals).map(
+                          ([category, total]) => (
+                            <div key={category}>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-medium">{category}</span>
+                                <Input
+                                  type="number"
+                                  value={budgets[category] ?? ""}
+                                  onChange={(e) =>
+                                    handleBudgetChange(category, e.target.value)
+                                  }
+                                  className="w-28"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <div className="text-xs text-muted-foreground text-right flex justify-end items-center gap-3">
+                                {previousBudgets &&
+                                  previousBudgets[category] !== undefined && (
+                                    <span className="italic">
+                                      (was:{" "}
+                                      {formatCurrency(
+                                        previousBudgets[category]
+                                      )}
+                                      )
+                                    </span>
+                                  )}
+                                <span>Spent: {formatCurrency(total)}</span>
+                              </div>
                             </div>
-                            <div className="text-xs text-muted-foreground text-right flex justify-end items-center gap-3">
-                              {previousBudgets &&
-                                previousBudgets[category] !== undefined && (
-                                  <span className="italic">
-                                    (was: {formatCurrency(previousBudgets[category])})
-                                  </span>
-                                )}
-                              <span>Spent: {formatCurrency(total)}</span>
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        )}
                       </div>
                     </ScrollArea>
                   </div>
@@ -312,7 +325,10 @@ export default function Home() {
                     <div className="flex flex-row gap-2">
                       {isConnected && (
                         <>
-                          <Button variant="outline" onClick={() => refreshTransactions()}>
+                          <Button
+                            variant="outline"
+                            onClick={() => refreshTransactions()}
+                          >
                             <HiOutlineRefresh />
                           </Button>
                           <Button
@@ -380,7 +396,7 @@ export default function Home() {
           )}
         </div>
       </div>
-    </div >
+    </div>
   );
 }
 

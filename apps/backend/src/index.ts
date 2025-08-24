@@ -5,7 +5,7 @@ import { clerkWebhookRoutes } from "./routes/clerk-webhook.route";
 import { connectToDb } from "./services/mongo.service";
 import { plaidWebhookRoutes } from "./routes/plaid-webhook.route";
 import { userRoutes } from "./routes/user.route";
-import { openaiRoutes } from "./routes/openai.route";
+import { cohereRoutes } from "./routes/cohere.route";
 
 await connectToDb();
 
@@ -13,7 +13,7 @@ const app = baseApp
   .get("/", () => ({ message: "Hello from Elysia!" }))
   .use(plaidRoutes)
   .use(userRoutes)
-  .use(openaiRoutes)
+  .use(cohereRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
 
 console.log(
