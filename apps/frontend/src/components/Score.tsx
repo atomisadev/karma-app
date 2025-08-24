@@ -41,9 +41,9 @@ export default function Score({
   const ratio = scoreToRatio(s);
   const angle = START_ANGLE + ratio * SWEEP_DEG;
 
-  const thickness = 26;
+  const thickness = 30;
   const w = size; 
-  const r = (w - thickness) / 3;
+  const r = (w - thickness) / 2.5;
   const cx = w / 2;
   const cy = r + thickness / 2;
   const h = r + thickness;
@@ -122,9 +122,8 @@ export default function Score({
             x2={cx + r}
             y2={cy}
           >
-            <stop offset="0%" stopColor="#ef4444" />
-            <stop offset="50%" stopColor="#eab308" />
-            <stop offset="100%" stopColor="#22c55e" />
+            <stop offset="0%" stopColor="oklch(0.5854 0.2041 277.1173)" />
+            <stop offset="100%" stopColor="oklch(0.2795 0.0368 260.0310)" />
           </linearGradient>
         </defs>
       </svg>
