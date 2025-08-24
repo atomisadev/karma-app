@@ -8,6 +8,26 @@ import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import Score from "../../components/Score";
 import { useUserProfile } from "./_hooks/use-user";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { useMutation } from "@tanstack/react-query";
 import { eden } from "@/lib/api";
 import { toast } from "sonner";
@@ -263,77 +283,103 @@ export default function Home() {
             </>
           )}
         </div>
+      )}
+      {isConnected && (
+        <div className="w-full md:w-1/2 flex flex-col items-center gap-8">
+          {!!transactions?.length && !transactionsLoading && (
+            <Card className="w-full max-w-2xl">
+              <CardHeader>
+                <CardTitle>
+                  {isConnected && !transactions?.length && !transactionsLoading && (
+                    <p className="text-gray-500">
+                      No transactions found. Try refreshing or check your account.
+                    </p>
+                  )}
 
-        {isConnected && !transactions?.length && !transactionsLoading && (
-          <p className="text-gray-500">
-            No transactions found. Try refreshing or check your account.
-          </p>
-        )}
+                  {!isConnected && !transactions?.length && (
+                    <p className="text-gray-500">
+                      Connect your bank account to view transactions.
+                    </p>
+                  )}
 
-        {!isConnected && !transactions?.length && (
-          <p className="text-gray-500">
-            Connect your bank account to view transactions.
-          </p>
-        )}
-
-        {transactionsLoading && (
-          <div className="w-full max-w-2xl">
-            <Skeleton className="h-6 w-40 mb-4" />
-            <div className="divide-y rounded-md border">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="p-3 flex justify-between">
-                  <div className="flex flex-col gap-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!!transactions?.length && !transactionsLoading && (
-          <div className="w-full max-w-2xl">
-            <h2 className="text-xl font-medium mb-2">Recent transactions</h2>
-            <ul className="divide-y rounded-md border overflow-scroll overflow-x-hidden h-[68vh]">
-              {transactions.map((tx: any) => {
-                const isPending = tx.status === "pending";
-                const displayAmount = -tx.amount;
-                const amountColor =
-                  displayAmount > 0 ? "text-green-600" : "text-red-600";
-
-                return (
-                  <li
-                    key={tx.transaction_id}
-                    className={cn(
-                      "p-3 flex justify-between items-center",
-                      isPending && "opacity-60"
-                    )}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">
-                        {tx.name || "Transaction"}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {tx.date} {isPending && "(Pending)"}
-                      </span>
+                  {transactionsLoading && (
+                    <div className="w-full max-w-2xl">
+                      <Skeleton className="h-6 w-40 mb-4" />
+                      <div className="divide-y rounded-md border">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="p-3 flex justify-between">
+                            <div className="flex flex-col gap-2">
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-3 w-20" />
+                            </div>
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span
-                      className={cn("font-mono font-semibold", amountColor)}
-                    >
-                      {new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: tx.iso_currency_code || "USD",
-                      }).format(displayAmount)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
+                  )}
+                  <div className="flex flex-row justify-ends">
+
+                  <p>Recent transactions</p>
+
+                    <div>
+                      <Button
+                        className="rounded-md border px-4 py-2"
+                        onClick={() => refreshTransactions()}
+                      >
+                        Refresh transactions
+                      </Button>
+                      <Button variant="destructive"
+                        onClick={() => disconnect()}
+                        disabled={isDisconnecting}
+                      >
+                        {isDisconnecting ? "Disconnecting..." : "Disconnect Account"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-y rounded-md border w-full overflow-scroll overflow-x-hidden h-[58vh]">
+                  {transactions.map((tx: any) => {
+                    const isPending = tx.status === "pending";
+                    const displayAmount = -tx.amount;
+                    const amountColor =
+                      displayAmount > 0 ? "text-green-600" : "text-red-600";
+
+                    return (
+                      <li
+                        key={tx.transaction_id}
+                        className={cn(
+                          "p-3 flex justify-between items-center",
+                          isPending && "opacity-60"
+                        )}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {tx.name || "Transaction"}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {tx.date} {isPending && "(Pending)"}
+                          </span>
+                        </div>
+                        <span
+                          className={cn("font-mono font-semibold", amountColor)}
+                        >
+                          {new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: tx.iso_currency_code || "USD",
+                          }).format(displayAmount)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
