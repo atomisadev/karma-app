@@ -1,4 +1,3 @@
-// ... (imports and helper functions are unchanged)
 import { getDb } from "./mongo.service";
 import type { Transaction } from "@backend/schemas/transaction.schema";
 import type { User } from "@backend/schemas/user.schema";
@@ -218,14 +217,12 @@ export const processNewTransactionForKarma = async (
 
   let currentUserState = user;
 
-  // --- 1. Check and resolve any existing challenges ---
   if (currentUserState.activeChallenge) {
     const { instruction, dateSet } = currentUserState.activeChallenge;
     const challengeDayYMD = toYMD(addDays(dateSet, 1));
     const staleDateYMD = toYMD(addDays(dateSet, 2));
     const txYMD = newTransaction.date;
 
-    // A. If the new transaction is on the challenge day, check for immediate failure.
     if (txYMD === challengeDayYMD) {
       if (
         await doesTransactionViolateInstruction(instruction, newTransaction)
@@ -236,12 +233,9 @@ export const processNewTransactionForKarma = async (
           { clerkId: userId },
           { $set: { karmaScore: newScore }, $unset: { activeChallenge: "" } }
         );
-        return; // Challenge failed and resolved, so we stop here.
+        return;
       }
-    }
-    // B. If the new transaction is after the challenge period, the challenge is stale.
-    //    Let's check if the user succeeded and award karma.
-    else if (txYMD >= staleDateYMD) {
+    } else if (txYMD >= staleDateYMD) {
       const challengeDayTxs = await transactions
         .find({ clerkId: userId, date: challengeDayYMD })
         .toArray();
@@ -250,7 +244,7 @@ export const processNewTransactionForKarma = async (
       for (const tx of challengeDayTxs) {
         if (await doesTransactionViolateInstruction(instruction, tx)) {
           wasViolated = true;
-          break; // A violation was found, no need to check further.
+          break;
         }
       }
 
@@ -263,7 +257,6 @@ export const processNewTransactionForKarma = async (
         );
       }
 
-      // Clear the stale challenge regardless of the outcome.
       await users.updateOne(
         { clerkId: userId },
         { $unset: { activeChallenge: "" } }
@@ -272,8 +265,6 @@ export const processNewTransactionForKarma = async (
     }
   }
 
-  // --- 2. Check if the new transaction should trigger a new challenge ---
-  // Re-fetch user to see if the activeChallenge was just cleared.
   const potentiallyUpdatedUser = await users.findOne({ clerkId: userId });
   if (!potentiallyUpdatedUser?.activeChallenge) {
     const isTxIndulgence = await isIndulgence(
@@ -294,7 +285,6 @@ export const processNewTransactionForKarma = async (
       );
 
       if (newInstruction) {
-        // **THE FIX IS HERE**: Clean the instruction before saving.
         newInstruction = newInstruction.trim().replace(/^"|"$/g, "");
 
         console.log(`Setting new challenge for ${userId}: "${newInstruction}"`);
