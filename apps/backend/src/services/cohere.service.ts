@@ -31,7 +31,7 @@ export async function isIndulgence(
   transactionCategory: string[] | undefined
 ): Promise<boolean> {
   try {
-    const prompt = `Is the following transaction typically considered an "indulgence" or a non-essential purchase?
+    const prompt = `Is the following transaction typically considered an "indulgence" or a non-essential purchase? Indulgent purchases can range anywhere from travel purchases, clothing, electronics, dining out, snacks and treats, hobbies and media, live events, beauty and wellness, fitness.
     Transaction Name: ${transactionName}
     Category: ${transactionCategory?.join(", ") || "N/A"}
     Answer with only "yes" or "no" in lowercase, without any other text or punctuation.`;

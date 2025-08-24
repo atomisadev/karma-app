@@ -2,7 +2,7 @@ import { getFinancialInsight } from "@backend/services/cohere.service";
 import type { App } from "../app";
 
 export const cohereRoutes = (app: App) =>
-  app.group("/api/openai", (group) =>
+  app.group("/api/cohere", (group) =>
     group.post(
       "/insight",
       async ({ request, requireAuth, set }) => {

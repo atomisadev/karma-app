@@ -18,6 +18,8 @@ type Merchant = {
   amountRange: [number, number];
 };
 
+// helper functions
+
 const randomDateInMonth = (year: number, month: number): string => {
   const day = randomInt(1, 28);
   const date = new Date(year, month, day);
@@ -217,18 +219,21 @@ export const processNewTransactionForKarma = async (
 
   let currentUserState = user;
 
+  // check for an active challenge and process its outcome
   if (currentUserState.activeChallenge) {
     const { instruction, dateSet } = currentUserState.activeChallenge;
     const challengeDayYMD = toYMD(addDays(dateSet, 1));
     const staleDateYMD = toYMD(addDays(dateSet, 2));
     const txYMD = newTransaction.date;
 
+    // if the new transaction occurred on challenge day, check for a violation
     if (txYMD === challengeDayYMD) {
       if (
         await doesTransactionViolateInstruction(instruction, newTransaction)
       ) {
         console.log(`User ${userId} failed challenge: "${instruction}"`);
         const newScore = Math.max(300, user.karmaScore - KARMA_DECREMENT);
+        // challenge failed -> decrease karma and clear the active challenge
         await users.updateOne(
           { clerkId: userId },
           { $set: { karmaScore: newScore }, $unset: { activeChallenge: "" } }
@@ -236,6 +241,7 @@ export const processNewTransactionForKarma = async (
         return;
       }
     } else if (txYMD >= staleDateYMD) {
+      // if the transaction is from a day *after* the challenge was active, check if the challenge was successfully completed
       const challengeDayTxs = await transactions
         .find({ clerkId: userId, date: challengeDayYMD })
         .toArray();
@@ -251,12 +257,14 @@ export const processNewTransactionForKarma = async (
       if (!wasViolated) {
         console.log(`User ${userId} succeeded in challenge: "${instruction}"`);
         const newScore = Math.min(850, user.karmaScore + KARMA_INCREMENT);
+        // challenge succeded: increase karma
         await users.updateOne(
           { clerkId: userId },
           { $set: { karmaScore: newScore } }
         );
       }
 
+      // challenge is now resolved, clear it
       await users.updateOne(
         { clerkId: userId },
         { $unset: { activeChallenge: "" } }
@@ -265,7 +273,10 @@ export const processNewTransactionForKarma = async (
     }
   }
 
+  // potentially create a new challenge based on current transaction
   const potentiallyUpdatedUser = await users.findOne({ clerkId: userId });
+
+  // only create a new challenge if there alr isn't one active
   if (!potentiallyUpdatedUser?.activeChallenge) {
     const isTxIndulgence = await isIndulgence(
       newTransaction.name,
@@ -273,12 +284,14 @@ export const processNewTransactionForKarma = async (
     );
 
     if (isTxIndulgence) {
+      // fetch recent transactions to provide context for the AI
       const recentTx = await transactions
         .find({ clerkId: userId })
         .sort({ date: -1 })
         .limit(30)
         .toArray();
 
+      // use the ai to generate a new challenge
       let newInstruction = await getSuggestedChallengeInstruction(
         recentTx,
         newTransaction

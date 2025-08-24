@@ -11,6 +11,7 @@ import { type Transaction } from "@backend/schemas/transaction.schema";
 import { processNewTransactionForKarma } from "@backend/services/transaction.service";
 import { ObjectId } from "mongodb";
 
+// initialize plaid api client with creds from env
 const plaid = new PlaidApi(
   new Configuration({
     basePath: PlaidEnvironments[process.env.PLAID_ENV || "sandbox"],
@@ -35,6 +36,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
     const event = parsed.data as PlaidWebhookInput;
 
     if (event.webhookType !== "TRANSACTIONS") {
+      // ignore nontransaction webhooks
       return { ok: true, ignored: true };
     }
 
@@ -43,6 +45,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
       const users = db.collection<User>("users");
       const transactionsCollection = db.collection<Transaction>("transactions");
 
+      // find the user associated w/ the plaid item ID from the webhook
       const user = await users.findOne({ plaidItemId: event.itemId });
       if (!user) {
         return { ok: true, unknownItem: true };
@@ -55,8 +58,11 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
         case "INITIAL_UPDATE":
         case "HISTORICAL_UPDATE":
         case "SYNC_UPDATES_AVAILABLE": {
+          // wait to ensure plaid's transaction data is ready
           await new Promise((resolve) => setTimeout(resolve, 1500));
 
+          // sync transactions using plaid's `/transactions/sync` endpoint
+          // loop fetches all available transaction updates from plaid in batches
           let hasMore = true;
           let cursor = user.plaidTransactionsCursor;
 
@@ -66,6 +72,8 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
               cursor: cursor,
             });
 
+            // prepare bulk write operations for newly added or modified transactions
+            // `upsert: true` makes sure that new transactions are inserted and existing ones are updated
             const upsertOperations = [...data.added, ...data.modified].map(
               (tx) => ({
                 updateOne: {
@@ -93,7 +101,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
               await transactionsCollection.bulkWrite(upsertOperations as any);
               console.log(`Synced ${upsertOperations.length} transactions.`);
 
-              // Process each added/modified transaction for challenge/karma in near-realtime
+              // process each added/modified transaction for challenge/karma in near-realtime
               const incoming = [...data.added, ...data.modified];
               for (const tx of incoming) {
                 const txDoc: Transaction = {
@@ -114,6 +122,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
               }
             }
 
+            // remove transactions marked as removed by plaid
             if (data.removed.length > 0) {
               const removedIds = data.removed.map((tx) => tx.transaction_id);
               await transactionsCollection.deleteMany({
@@ -122,6 +131,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
               console.log(`Removed ${data.removed.length} transactions.`);
             }
 
+            // update cursor for next sync if more data is available
             hasMore = data.has_more;
             cursor = data.next_cursor;
           }
@@ -133,7 +143,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
           break;
         }
         case "TRANSACTIONS_REMOVED": {
-          // No-op
+          // No-op -- plaid handles removed transactions via sync updates now
           break;
         }
         default: {

@@ -111,7 +111,7 @@ export default function Home() {
     mutationFn: async (prompt: string) => {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated");
-      const { data, error } = await eden.api.openai.insight.post(
+      const { data, error } = await eden.api.cohere.insight.post(
         { prompt },
         { headers: { Authorization: `Bearer ${token}` } }
       );
