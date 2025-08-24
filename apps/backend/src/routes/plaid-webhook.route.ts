@@ -8,6 +8,8 @@ import Elysia from "elysia";
 import { z } from "zod";
 import { PlaidApi, Configuration, PlaidEnvironments } from "plaid";
 import { type Transaction } from "@backend/schemas/transaction.schema";
+import { processNewTransactionForKarma } from "@backend/services/transaction.service";
+import { ObjectId } from "mongodb";
 
 const plaid = new PlaidApi(
   new Configuration({
@@ -52,7 +54,7 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
         case "DEFAULT_UPDATE":
         case "INITIAL_UPDATE":
         case "HISTORICAL_UPDATE":
-        case "SYNC_UPDATES_AVAILABLE":
+        case "SYNC_UPDATES_AVAILABLE": {
           await new Promise((resolve) => setTimeout(resolve, 1500));
 
           let hasMore = true;
@@ -90,6 +92,26 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
             if (upsertOperations.length > 0) {
               await transactionsCollection.bulkWrite(upsertOperations as any);
               console.log(`Synced ${upsertOperations.length} transactions.`);
+
+              // Process each added/modified transaction for challenge/karma in near-realtime
+              const incoming = [...data.added, ...data.modified];
+              for (const tx of incoming) {
+                const txDoc: Transaction = {
+                  _id: new ObjectId(),
+                  clerkId: user.clerkId,
+                  plaidTransactionId: tx.transaction_id,
+                  plaidAccountId: tx.account_id,
+                  amount: tx.amount,
+                  date: tx.date,
+                  name: tx.name,
+                  paymentChannel: tx.payment_channel || "other",
+                  category: tx.category || undefined,
+                  isoCurrencyCode: tx.iso_currency_code || "USD",
+                  status: tx.pending ? "pending" : "cleared",
+                } as Transaction;
+
+                await processNewTransactionForKarma(user.clerkId, txDoc);
+              }
             }
 
             if (data.removed.length > 0) {
@@ -109,10 +131,14 @@ export const plaidWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
             { $set: { plaidTransactionsCursor: cursor } }
           );
           break;
-        case "TRANSACTIONS_REMOVED":
+        }
+        case "TRANSACTIONS_REMOVED": {
+          // No-op
           break;
-        default:
+        }
+        default: {
           break;
+        }
       }
 
       return { ok: true };
