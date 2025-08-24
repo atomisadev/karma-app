@@ -12,12 +12,17 @@ export const userSchema = z.object({
   plaidTransactionsCursor: z.string().optional(),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
-
   onboardingCompleted: z.boolean().default(false),
-
   budgets: z.record(z.string(), z.number()).default({}),
-
   seededTransactionsAt: z.date().optional(),
+  karmaScore: z.number().default(500),
+  activeChallenge: z
+    .object({
+      categoryToAvoid: z.string(),
+      instruction: z.string().optional(),
+      dateSet: z.date(),
+    })
+    .optional(),
 });
 
 export type User = z.infer<typeof userSchema>;

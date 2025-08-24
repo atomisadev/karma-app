@@ -3,6 +3,14 @@ import type { Transaction } from "@backend/schemas/transaction.schema";
 import type { User } from "@backend/schemas/user.schema";
 import { ObjectId } from "mongodb";
 import { readFile } from "fs/promises";
+import {
+  doesTransactionMatchCategory,
+  getSuggestedChallenge,
+  isIndulgence,
+  doesTransactionViolateInstruction,
+} from "./openai.service";
+
+const KARMA_DECREMENT = 25;
 
 type Merchant = {
   name: string;
@@ -187,4 +195,107 @@ export const replaceWithSeedTransactions = async (
     `Replaced transactions with ${docs.length} seeded transactions for user ${clerkId}.`
   );
   return { ok: true as const, seeded: docs.length };
+};
+
+export const processNewTransactionForKarma = async (
+  userId: string,
+  newTransaction: Transaction
+) => {
+  const db = getDb();
+  const users = db.collection<User>("users");
+  const transactions = db.collection<Transaction>("transactions");
+
+  const user = await users.findOne({ clerkId: userId });
+  if (!user) return;
+
+  if (user.activeChallenge) {
+    const { categoryToAvoid, dateSet } = user.activeChallenge;
+
+    const toLocalYMD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    };
+    const addDaysYmd = (ymd: string, days: number) => {
+      const dt = new Date(ymd + "T00:00:00");
+      dt.setDate(dt.getDate() + days);
+      return toLocalYMD(dt);
+    };
+
+    const challengeStartYmd = toLocalYMD(new Date(dateSet));
+    const challengeDayYmd = addDaysYmd(challengeStartYmd, 1);
+    const staleYmd = addDaysYmd(challengeStartYmd, 2);
+    const txYmd = (newTransaction.date || "").slice(0, 10);
+
+    if (txYmd === challengeStartYmd || txYmd === challengeDayYmd) {
+      let isChallengeFailed = false;
+
+      if (user.activeChallenge.instruction) {
+        isChallengeFailed = await doesTransactionViolateInstruction(
+          user.activeChallenge.instruction,
+          newTransaction
+        );
+      } else if (categoryToAvoid) {
+        isChallengeFailed = await doesTransactionMatchCategory(
+          newTransaction.name,
+          categoryToAvoid
+        );
+      }
+
+      if (isChallengeFailed) {
+        console.log(
+          `User ${userId} failed the challenge to avoid ${categoryToAvoid || "specified instruction"}.`
+        );
+        const newScore = Math.max(300, user.karmaScore - KARMA_DECREMENT);
+        await users.updateOne(
+          { clerkId: userId },
+          { $set: { karmaScore: newScore }, $unset: { activeChallenge: "" } }
+        );
+        return;
+      }
+    }
+
+    if (txYmd >= staleYmd) {
+      await users.updateOne(
+        { clerkId: userId },
+        { $unset: { activeChallenge: "" } }
+      );
+      console.log(`Cleared stale challenge for user ${userId}.`);
+    }
+  }
+
+  const isTxIndulgence = await isIndulgence(
+    newTransaction.name,
+    newTransaction.category
+  );
+  if (isTxIndulgence) {
+    const recentTx = await transactions
+      .find({ clerkId: userId })
+      .sort({ date: -1 })
+      .limit(30)
+      .toArray();
+    const suggestedCategory = await getSuggestedChallenge(
+      recentTx,
+      newTransaction.name
+    );
+
+    if (suggestedCategory) {
+      console.log(
+        `Setting new challenge for ${userId}: avoid ${suggestedCategory}.`
+      );
+      await users.updateOne(
+        { clerkId: userId },
+        {
+          $set: {
+            activeChallenge: {
+              categoryToAvoid: suggestedCategory,
+              instruction: `Hey, how about you avoid ${suggestedCategory.toLowerCase()} tomorrow? Any transaction that counts as ${suggestedCategory.toLowerCase()} will be considered a violation and will deduct 25 karma points.`,
+              dateSet: new Date(),
+            },
+          },
+        }
+      );
+    }
+  }
 };

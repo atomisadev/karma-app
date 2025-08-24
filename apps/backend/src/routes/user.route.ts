@@ -32,6 +32,8 @@ export const userRoutes = (app: App) =>
           imageUrl: user.imageUrl,
           onboardingCompleted: user.onboardingCompleted ?? false,
           budgets: user.budgets ?? {},
+          karmaScore: user.karmaScore ?? 500,
+          activeChallenge: user.activeChallenge ?? null,
         };
       })
       .patch("/budgets", async ({ body, set, requireAuth }) => {

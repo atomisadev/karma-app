@@ -1,28 +1,35 @@
 import { getFinancialInsight } from "@backend/services/openai.service";
 import type { App } from "../app";
-import { t } from "elysia";
 
 export const openaiRoutes = (app: App) =>
   app.group("/api/openai", (group) =>
     group.post(
       "/insight",
-      async ({ body, requireAuth, set }) => {
+      async ({ request, requireAuth, set }) => {
         const userId = requireAuth();
 
-        const { prompt } = body;
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          set.status = 400;
+          return { error: "Invalid body" };
+        }
+
+        const prompt = (body as any)?.prompt;
+        if (typeof prompt !== "string" || prompt.length === 0) {
+          set.status = 400;
+          return { error: "Invalid body" };
+        }
 
         try {
-          const insight = getFinancialInsight(prompt);
+          const insight = await getFinancialInsight(prompt);
           return insight;
         } catch (error) {
           set.status = 500;
           return { error: (error as Error).message };
         }
       },
-      {
-        body: t.Object({
-          prompt: t.String(),
-        }),
-      }
+      { type: "none" }
     )
   );

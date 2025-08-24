@@ -14,22 +14,24 @@ import {
 
 export const clerkWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
   "/clerk",
-  async ({ body, headers, set }) => {
+  async ({ request, set }: { request: Request; set: any }) => {
     try {
       const webhook = new Webhook(env.CLERK_WEBHOOK_SECRET);
 
-      const svixId = headers["svix-id"];
-      const svixTimestamp = headers["svix-timestamp"];
-      const svixSignature = headers["svix-signature"];
+      const svixId = request.headers.get("svix-id");
+      const svixTimestamp = request.headers.get("svix-timestamp");
+      const svixSignature = request.headers.get("svix-signature");
 
       if (!svixId || !svixTimestamp || !svixSignature) {
         set.status = 400;
         return { error: "Missing svix headers" };
       }
 
+      const payload = await request.text();
+
       let event: unknown;
       try {
-        event = webhook.verify(JSON.stringify(body), {
+        event = webhook.verify(payload, {
           "svix-id": svixId,
           "svix-timestamp": svixTimestamp,
           "svix-signature": svixSignature,
@@ -65,7 +67,8 @@ export const clerkWebhookRoutes = new Elysia({ prefix: "/webhook" }).post(
       set.status = 500;
       return { error: "Internal server error" };
     }
-  }
+  },
+  { type: "none" }
 );
 
 const handleUserCreated = async (event: ClerkUserEvent) => {
@@ -90,6 +93,7 @@ const handleUserCreated = async (event: ClerkUserEvent) => {
       imageUrl: data.image_url || undefined,
       onboardingCompleted: false,
       budgets: {},
+      karmaScore: 500,
     };
 
     const validatedUser = userSchema.parse({

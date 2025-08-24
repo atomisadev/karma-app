@@ -16,6 +16,8 @@ import {
 import type { App } from "../app";
 import { getDb } from "../services/mongo.service";
 import type { Transaction } from "../schemas/transaction.schema";
+import { processNewTransactionForKarma } from "@backend/services/transaction.service";
+import { ObjectId } from "mongodb";
 
 export const plaidRoutes = (app: App) =>
   app.group("/api/plaid", (group) =>
@@ -79,8 +81,17 @@ export const plaidRoutes = (app: App) =>
       })
       .post(
         "/sandbox/createTransactions",
-        async ({ body, set, requireAuth }) => {
+        async ({ request, set, requireAuth }) => {
           const userId = requireAuth();
+
+          let body: unknown;
+          try {
+            body = await request.json();
+          } catch {
+            set.status = 400;
+            return { ok: false, error: "Invalid body" };
+          }
+
           const parsed = SandboxCreateTransactionsSchema.safeParse(body);
           if (!parsed.success) {
             set.status = 400;
@@ -104,15 +115,24 @@ export const plaidRoutes = (app: App) =>
               date: t.datePosted,
               name: t.description,
               paymentChannel: "manual",
-              category: ["Manual", "Custom"],
+              category: [t.description.split(" ")[0]],
               isoCurrencyCode: t.isoCurrencyCode || "USD",
               status: "pending" as const,
             }));
 
-            await transactionsCollection.insertMany(documents as any);
-            console.log(
-              `Successfully created ${documents.length} manual transactions.`
-            );
+            if (documents.length > 0) {
+              await transactionsCollection.insertMany(documents as any);
+              console.log(
+                `Successfully created ${documents.length} manual transactions.`
+              );
+
+              for (const doc of documents) {
+                await processNewTransactionForKarma(userId, {
+                  ...doc,
+                  _id: new ObjectId(),
+                });
+              }
+            }
 
             return { ok: true };
           } catch (error) {
@@ -120,7 +140,8 @@ export const plaidRoutes = (app: App) =>
             set.status = 500;
             return { ok: false, error: "Internal server error" };
           }
-        }
+        },
+        { type: "none" }
       )
       .get("/status", async ({ requireAuth }) => {
         const userId = requireAuth();
