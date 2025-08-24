@@ -18,8 +18,7 @@ export const userSchema = z.object({
   karmaScore: z.number().default(500),
   activeChallenge: z
     .object({
-      categoryToAvoid: z.string(),
-      instruction: z.string().optional(),
+      instruction: z.string(),
       dateSet: z.date(),
     })
     .optional(),

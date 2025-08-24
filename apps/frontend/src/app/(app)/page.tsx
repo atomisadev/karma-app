@@ -1,6 +1,12 @@
 "use client";
 
-import { ClerkProvider, SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
+import {
+  ClerkProvider,
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  UserButton,
+} from "@clerk/nextjs";
 import { useMemo, useState, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { usePlaid } from "@/app/(app)/_hooks/use-plaid";
@@ -47,7 +53,10 @@ export default function Home() {
 
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [previousBudgets, setPreviousBudgets] = useState<Record<string, number> | null>(null);
+  const [previousBudgets, setPreviousBudgets] = useState<Record<
+    string,
+    number
+  > | null>(null);
 
   useEffect(() => {
     if (me?.budgets) {
@@ -199,7 +208,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className='p-4 fixed'>
+      <div className="p-4 fixed">
         <UserButton />
       </div>
 
@@ -234,14 +243,21 @@ export default function Home() {
               <TabsTrigger value="transactions">Transactions</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="budgets" className="flex flex-col flex-1 overflow-hidden">
+            <TabsContent
+              value="budgets"
+              className="flex flex-col flex-1 overflow-hidden"
+            >
               <Card className="w-full max-w-2xl flex flex-col h-full">
                 <CardHeader>
                   <CardTitle>
                     <div className="flex gap-4 flex-row justify-between items-center">
                       <div className="mb-4">
-                        <p className="text-sm text-muted-foreground">Monthly Income</p>
-                        <p className="text-3xl font-bold">{formatCurrency(income30)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Monthly Income
+                        </p>
+                        <p className="text-3xl font-bold">
+                          {formatCurrency(income30)}
+                        </p>
                       </div>
                       <div className="flex flex-row gap-2">
                         {isConnected && (
@@ -266,7 +282,10 @@ export default function Home() {
                         disabled={aiSuggestionMutation.isPending}
                         size="sm"
                       >
-                        ✨ {aiSuggestionMutation.isPending ? "Thinking..." : "Ask AI"}
+                        ✨{" "}
+                        {aiSuggestionMutation.isPending
+                          ? "Thinking..."
+                          : "Ask AI"}
                       </Button>
                       <Button
                         onClick={handleSaveBudgets}
@@ -280,35 +299,44 @@ export default function Home() {
 
                   <ScrollArea className="flex-1 overflow-y-auto pr-2">
                     <div className="space-y-3">
-                      {Object.entries(categoryTotals).map(([category, total]) => (
-                        <div key={category}>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-medium">{category}</span>
-                            <Input
-                              type="number"
-                              value={budgets[category] ?? ""}
-                              onChange={(e) => handleBudgetChange(category, e.target.value)}
-                              className="w-28"
-                              placeholder="0.00"
-                            />
+                      {Object.entries(categoryTotals).map(
+                        ([category, total]) => (
+                          <div key={category}>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-medium">{category}</span>
+                              <Input
+                                type="number"
+                                value={budgets[category] ?? ""}
+                                onChange={(e) =>
+                                  handleBudgetChange(category, e.target.value)
+                                }
+                                className="w-28"
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground text-right flex justify-end items-center gap-3">
+                              {previousBudgets &&
+                                previousBudgets[category] !== undefined && (
+                                  <span className="italic">
+                                    (was:{" "}
+                                    {formatCurrency(previousBudgets[category])})
+                                  </span>
+                                )}
+                              <span>Spent: {formatCurrency(total)}</span>
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground text-right flex justify-end items-center gap-3">
-                            {previousBudgets && previousBudgets[category] !== undefined && (
-                              <span className="italic">
-                                (was: {formatCurrency(previousBudgets[category])})
-                              </span>
-                            )}
-                            <span>Spent: {formatCurrency(total)}</span>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      )}
                     </div>
                   </ScrollArea>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="transactions" className="flex flex-col flex-1 overflow-hidden">
+            <TabsContent
+              value="transactions"
+              className="flex flex-col flex-1 overflow-hidden"
+            >
               <Card className="w-full max-w-2xl flex flex-col h-full">
                 <CardHeader className="flex-shrink-0">
                   <CardTitle>
@@ -317,7 +345,10 @@ export default function Home() {
                       <div className="flex flex-row gap-2">
                         {isConnected && (
                           <>
-                            <Button variant="outline" onClick={() => refreshTransactions()}>
+                            <Button
+                              variant="outline"
+                              onClick={() => refreshTransactions()}
+                            >
                               <HiOutlineRefresh />
                             </Button>
                             <Button
@@ -336,7 +367,8 @@ export default function Home() {
                 <CardContent className="flex flex-col flex-1 overflow-hidden">
                   {!transactions?.length ? (
                     <p className="text-muted-foreground text-center">
-                      No transactions found. Try refreshing or check your account.
+                      No transactions found. Try refreshing or check your
+                      account.
                     </p>
                   ) : (
                     <ScrollArea className="flex-1 w-full rounded-md border overflow-y-auto">
@@ -345,7 +377,9 @@ export default function Home() {
                           const isPending = tx.status === "pending";
                           const displayAmount = -tx.amount;
                           const amountColor =
-                            displayAmount > 0 ? "text-green-600" : "text-red-600";
+                            displayAmount > 0
+                              ? "text-green-600"
+                              : "text-red-600";
 
                           return (
                             <li
@@ -356,12 +390,19 @@ export default function Home() {
                               )}
                             >
                               <div className="flex flex-col">
-                                <span className="font-medium">{tx.name || "Transaction"}</span>
+                                <span className="font-medium">
+                                  {tx.name || "Transaction"}
+                                </span>
                                 <span className="text-sm text-muted-foreground">
                                   {tx.date} {isPending && "(Pending)"}
                                 </span>
                               </div>
-                              <span className={cn("font-mono font-semibold", amountColor)}>
+                              <span
+                                className={cn(
+                                  "font-mono font-semibold",
+                                  amountColor
+                                )}
+                              >
                                 {new Intl.NumberFormat("en-US", {
                                   style: "currency",
                                   currency: tx.iso_currency_code || "USD",

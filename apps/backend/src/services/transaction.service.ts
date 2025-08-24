@@ -1,16 +1,17 @@
+// ... (imports and helper functions are unchanged)
 import { getDb } from "./mongo.service";
 import type { Transaction } from "@backend/schemas/transaction.schema";
 import type { User } from "@backend/schemas/user.schema";
 import { ObjectId } from "mongodb";
 import { readFile } from "fs/promises";
 import {
-  doesTransactionMatchCategory,
-  getSuggestedChallenge,
-  isIndulgence,
   doesTransactionViolateInstruction,
+  getSuggestedChallengeInstruction,
+  isIndulgence,
 } from "./cohere.service";
 
 const KARMA_DECREMENT = 25;
+const KARMA_INCREMENT = 25;
 
 type Merchant = {
   name: string;
@@ -197,6 +198,13 @@ export const replaceWithSeedTransactions = async (
   return { ok: true as const, seeded: docs.length };
 };
 
+const toYMD = (d: Date) => d.toISOString().slice(0, 10);
+const addDays = (d: Date, days: number) => {
+  const newDate = new Date(d);
+  newDate.setDate(d.getDate() + days);
+  return newDate;
+};
+
 export const processNewTransactionForKarma = async (
   userId: string,
   newTransaction: Transaction
@@ -204,59 +212,58 @@ export const processNewTransactionForKarma = async (
   const db = getDb();
   const users = db.collection<User>("users");
   const transactions = db.collection<Transaction>("transactions");
-
   const user = await users.findOne({ clerkId: userId });
+
   if (!user) return;
 
-  if (user.activeChallenge) {
-    const { categoryToAvoid, dateSet } = user.activeChallenge;
+  let currentUserState = user;
 
-    const toLocalYMD = (d: Date) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${dd}`;
-    };
-    const addDaysYmd = (ymd: string, days: number) => {
-      const dt = new Date(ymd + "T00:00:00");
-      dt.setDate(dt.getDate() + days);
-      return toLocalYMD(dt);
-    };
+  // --- 1. Check and resolve any existing challenges ---
+  if (currentUserState.activeChallenge) {
+    const { instruction, dateSet } = currentUserState.activeChallenge;
+    const challengeDayYMD = toYMD(addDays(dateSet, 1));
+    const staleDateYMD = toYMD(addDays(dateSet, 2));
+    const txYMD = newTransaction.date;
 
-    const challengeStartYmd = toLocalYMD(new Date(dateSet));
-    const challengeDayYmd = addDaysYmd(challengeStartYmd, 1);
-    const staleYmd = addDaysYmd(challengeStartYmd, 2);
-    const txYmd = (newTransaction.date || "").slice(0, 10);
-
-    if (txYmd === challengeStartYmd || txYmd === challengeDayYmd) {
-      let isChallengeFailed = false;
-
-      if (user.activeChallenge.instruction) {
-        isChallengeFailed = await doesTransactionViolateInstruction(
-          user.activeChallenge.instruction,
-          newTransaction
-        );
-      } else if (categoryToAvoid) {
-        isChallengeFailed = await doesTransactionMatchCategory(
-          newTransaction.name,
-          categoryToAvoid
-        );
-      }
-
-      if (isChallengeFailed) {
-        console.log(
-          `User ${userId} failed the challenge to avoid ${categoryToAvoid || "specified instruction"}.`
-        );
+    // A. If the new transaction is on the challenge day, check for immediate failure.
+    if (txYMD === challengeDayYMD) {
+      if (
+        await doesTransactionViolateInstruction(instruction, newTransaction)
+      ) {
+        console.log(`User ${userId} failed challenge: "${instruction}"`);
         const newScore = Math.max(300, user.karmaScore - KARMA_DECREMENT);
         await users.updateOne(
           { clerkId: userId },
           { $set: { karmaScore: newScore }, $unset: { activeChallenge: "" } }
         );
-        return;
+        return; // Challenge failed and resolved, so we stop here.
       }
     }
+    // B. If the new transaction is after the challenge period, the challenge is stale.
+    //    Let's check if the user succeeded and award karma.
+    else if (txYMD >= staleDateYMD) {
+      const challengeDayTxs = await transactions
+        .find({ clerkId: userId, date: challengeDayYMD })
+        .toArray();
 
-    if (txYmd >= staleYmd) {
+      let wasViolated = false;
+      for (const tx of challengeDayTxs) {
+        if (await doesTransactionViolateInstruction(instruction, tx)) {
+          wasViolated = true;
+          break; // A violation was found, no need to check further.
+        }
+      }
+
+      if (!wasViolated) {
+        console.log(`User ${userId} succeeded in challenge: "${instruction}"`);
+        const newScore = Math.min(850, user.karmaScore + KARMA_INCREMENT);
+        await users.updateOne(
+          { clerkId: userId },
+          { $set: { karmaScore: newScore } }
+        );
+      }
+
+      // Clear the stale challenge regardless of the outcome.
       await users.updateOne(
         { clerkId: userId },
         { $unset: { activeChallenge: "" } }
@@ -265,37 +272,44 @@ export const processNewTransactionForKarma = async (
     }
   }
 
-  const isTxIndulgence = await isIndulgence(
-    newTransaction.name,
-    newTransaction.category
-  );
-  if (isTxIndulgence) {
-    const recentTx = await transactions
-      .find({ clerkId: userId })
-      .sort({ date: -1 })
-      .limit(30)
-      .toArray();
-    const suggestedCategory = await getSuggestedChallenge(
-      recentTx,
-      newTransaction.name
+  // --- 2. Check if the new transaction should trigger a new challenge ---
+  // Re-fetch user to see if the activeChallenge was just cleared.
+  const potentiallyUpdatedUser = await users.findOne({ clerkId: userId });
+  if (!potentiallyUpdatedUser?.activeChallenge) {
+    const isTxIndulgence = await isIndulgence(
+      newTransaction.name,
+      newTransaction.category
     );
 
-    if (suggestedCategory) {
-      console.log(
-        `Setting new challenge for ${userId}: avoid ${suggestedCategory}.`
+    if (isTxIndulgence) {
+      const recentTx = await transactions
+        .find({ clerkId: userId })
+        .sort({ date: -1 })
+        .limit(30)
+        .toArray();
+
+      let newInstruction = await getSuggestedChallengeInstruction(
+        recentTx,
+        newTransaction
       );
-      await users.updateOne(
-        { clerkId: userId },
-        {
-          $set: {
-            activeChallenge: {
-              categoryToAvoid: suggestedCategory,
-              instruction: `Hey, how about you avoid ${suggestedCategory.toLowerCase()} tomorrow? Any transaction that counts as ${suggestedCategory.toLowerCase()} will be considered a violation and will deduct 25 karma points.`,
-              dateSet: new Date(),
+
+      if (newInstruction) {
+        // **THE FIX IS HERE**: Clean the instruction before saving.
+        newInstruction = newInstruction.trim().replace(/^"|"$/g, "");
+
+        console.log(`Setting new challenge for ${userId}: "${newInstruction}"`);
+        await users.updateOne(
+          { clerkId: userId },
+          {
+            $set: {
+              activeChallenge: {
+                instruction: newInstruction,
+                dateSet: new Date(),
+              },
             },
-          },
-        }
-      );
+          }
+        );
+      }
     }
   }
 };

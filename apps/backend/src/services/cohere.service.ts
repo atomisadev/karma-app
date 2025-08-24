@@ -1,7 +1,6 @@
-import { AzureOpenAI } from "openai";
+import { CohereClient } from "cohere-ai";
 import { env } from "@backend/config";
 import type { Transaction } from "@backend/schemas/transaction.schema";
-import { CohereClient } from "cohere-ai";
 
 const cohere = new CohereClient({
   token: env.COHERE_API_KEY,
@@ -17,29 +16,12 @@ export async function getFinancialInsight(inputPrompt: string) {
     });
 
     if (!response.text) {
-      throw new Error("No output text received from OpenAI");
+      throw new Error("No output text received from Cohere");
     }
 
-    let text = response.text.trim();
-
-    if (text.startsWith("```")) {
-      text = text.replace(/^```[a-z]*\s*/i, "");
-      const fenceIdx = text.lastIndexOf("```");
-      if (fenceIdx !== -1) text = text.slice(0, fenceIdx).trim();
-    }
-
-    const tryParse = (s: string) => {
-      try {
-        return JSON.parse(s);
-      } catch {
-        return undefined;
-      }
-    };
-
-    let parsed = tryParse(text);
     return { insight: response.text };
   } catch (error) {
-    console.error("Error calling OpenAI API:", error);
+    console.error("Error calling Cohere API:", error);
     throw new Error("Failed to generate financial insight.");
   }
 }
@@ -67,31 +49,33 @@ export async function isIndulgence(
   }
 }
 
-export async function getSuggestedChallenge(
+export async function getSuggestedChallengeInstruction(
   recentTransactions: Transaction[],
-  indulgenceCategory: string
+  indulgentTransaction: Transaction
 ): Promise<string | null> {
   try {
-    const transactionHistory = recentTransactions
-      .map((tx) => `- ${tx.name} (${tx.category?.[0] || "Uncategorized"})`)
-      .join("\n");
-    const prompt = `Given the user's recent spending history and a recent indulgence:
-    Recent Transactions:
-    ${transactionHistory}
+    const indulgenceName = indulgentTransaction.name;
 
-    Recent Indulgence Category: ${indulgenceCategory}
+    const prompt = `A user just made an indulgent purchase: "${indulgenceName}".
+    Based on this, create a direct, one-sentence challenge to help them save money **tomorrow**.
 
-    Based on this history, what is ONE specific, non-essential spending category that the user could be challenged to avoid for one day? The suggested category should be a common, recurring expense.
-    Respond with only the category name, without any other text or punctuation. For example, "Coffee Shop" or "Fast Food".`;
+    Your response must follow this structure: "Since you recently spent on {indulgence}, your challenge for tomorrow is to {actionable goal}." The goal should be about **avoiding** a certain type of spending.
+
+    Examples:
+    - Indulgence: "AMC Theatres Ticket" -> "Since you recently spent on a movie, your challenge for tomorrow is to avoid dining out or ordering takeout."
+    - Indulgence: "Starbucks" -> "Since you recently spent on coffee, your challenge for tomorrow is to avoid buying drinks from cafes."
+
+    Respond with ONLY the single challenge sentence, without any quotation marks.`;
 
     const response = await cohere.chat({
       model: env.COHERE_MODEL_ID,
       preamble:
-        "You are a financial coach. Your task is to analyze a list of transactions and suggest a single, specific category for the user to avoid. Respond with only the category name.",
+        "You are a financial coach. Your task is to analyze a transaction and suggest a justified, one-sentence challenge for the user to complete tomorrow. You must follow the user's required format exactly.",
       message: prompt,
     });
-    const suggestedCategory = response.text?.trim();
-    return suggestedCategory || null;
+
+    // Clean the response to remove quotes, just in case.
+    return response.text?.trim().replace(/^"|"$/g, "") || null;
   } catch (error) {
     console.error("Error getting challenge suggestion:", error);
     return null;
