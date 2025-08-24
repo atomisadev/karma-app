@@ -4,9 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider"
-
 import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider"
 
 
 const geistSans = Geist({

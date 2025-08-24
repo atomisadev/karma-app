@@ -18,16 +18,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { useMutation } from "@tanstack/react-query";
 import { eden } from "@/lib/api";
 import { toast } from "sonner";
@@ -283,7 +273,6 @@ export default function Home() {
             </>
           )}
         </div>
-      )}
       {isConnected && (
         <div className="w-full md:w-1/2 flex flex-col items-center gap-8">
           {!!transactions?.length && !transactionsLoading && (
@@ -380,6 +369,7 @@ export default function Home() {
           )}
         </div>
       )}
+    </div>
     </div>
   );
 }
