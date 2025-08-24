@@ -3,10 +3,7 @@ import { z } from "zod";
 import type { App } from "../app";
 import { getDb } from "../services/mongo.service";
 import type { User } from "../schemas/user.schema";
-import {
-  seedRandomTransactionsIfNone,
-  replaceWithSeedTransactions,
-} from "../services/transaction.service";
+import { replaceWithSeedTransactions } from "../services/transaction.service";
 import { disconnectPlaidItem } from "../services/plaid.service";
 import { request } from "http";
 

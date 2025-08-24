@@ -1,14 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { usePlaid } from "@/app/(app)/_hooks/use-plaid";
 import { Skeleton } from "@/components/ui/skeleton";
-import { eden } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import Score from "../../components/Score";
 import { useUserProfile } from "./_hooks/use-user";
+import { useMutation } from "@tanstack/react-query";
+import { eden } from "@/lib/api";
+import { toast } from "sonner";
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
+};
 
 export default function Home() {
   const {
@@ -28,6 +37,10 @@ export default function Home() {
 
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [previousBudgets, setPreviousBudgets] = useState<Record<
+    string,
+    number
+  > | null>(null);
 
   useEffect(() => {
     if (me?.budgets) {
@@ -71,12 +84,50 @@ export default function Home() {
       )
       .forEach((t: any) => {
         const top = t.category?.[0] ?? "Other";
-        map.set(top, (map.get(top) ?? 0) + t.amount);
+        map.set(top, (map.get(top ?? 0) ?? 0) + t.amount);
       });
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
       .reduce<Record<string, number>>((acc, [k, v]) => ((acc[k] = v), acc), {});
   }, [transactions, last30Days]);
+
+  const aiSuggestionMutation = useMutation({
+    mutationFn: async (prompt: string) => {
+      const token = await getToken();
+      if (!token) throw new Error("Not authenticated");
+      const { data, error } = await eden.api.openai.insight.post(
+        { prompt },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (error) throw error.value;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data && "insight" in data) {
+        try {
+          const suggestedBudgets = JSON.parse(data.insight);
+          setBudgets(suggestedBudgets);
+          setHasChanges(true);
+          toast.success("AI budget recommendations applied!");
+        } catch (e) {
+          console.error("Failed to parse AI response:", e);
+          toast.error("The AI returned an invalid response. Please try again.");
+        }
+      } else if (data && "error" in data) {
+        console.error("AI suggestion error:", data.error);
+        toast.error(`An error occurred: ${data.error}`);
+      }
+    },
+  });
+
+  const handleGetAiSuggestions = () => {
+    setPreviousBudgets(budgets);
+    const categories = Object.keys(categoryTotals).join(", ");
+    const prompt = `My monthly income is ${formatCurrency(
+      income30
+    )}. My spending categories from the last month are: ${categories}. Please provide a recommended monthly budget for each of these categories as a JSON object, where keys are the category names and values are the budget amounts as numbers. The total budget should be less than my income.`;
+    aiSuggestionMutation.mutate(prompt);
+  };
 
   const handleBudgetChange = (category: string, value: string) => {
     setBudgets((prev) => ({
@@ -84,12 +135,15 @@ export default function Home() {
       [category]: Number(value || 0),
     }));
     setHasChanges(true);
+    setPreviousBudgets(null);
   };
 
   const handleSaveBudgets = () => {
     saveBudgets.mutate(budgets, {
       onSuccess: () => {
         setHasChanges(false);
+        setPreviousBudgets(null);
+        toast.success("Budgets saved successfully!");
       },
     });
   };
@@ -106,6 +160,7 @@ export default function Home() {
       </div>
     );
   }
+
   return (
     <div className="flex flex-col md:flex-row justify-evenly w-full font-sans p-8 gap-8">
       <div className="flex flex-col items-center w-full md:w-1/2">
@@ -118,23 +173,29 @@ export default function Home() {
             <h3 className="text-xl font-semibold mb-4">Financial Summary</h3>
             <div className="mb-6">
               <p className="text-sm text-gray-500">Monthly Income</p>
-              <p className="text-3xl font-bold">
-                {new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                }).format(income30)}
-              </p>
+              <p className="text-3xl font-bold">{formatCurrency(income30)}</p>
             </div>
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-semibold">Your Budgets</h4>
-                <button
-                  onClick={handleSaveBudgets}
-                  disabled={!hasChanges || saveBudgets.isPending}
-                  className="px-3 py-1 text-sm bg-black text-white rounded-md disabled:opacity-50"
-                >
-                  {saveBudgets.isPending ? "Saving..." : "Save"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleGetAiSuggestions}
+                    disabled={aiSuggestionMutation.isPending}
+                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md disabled:opacity-50 flex items-center gap-1"
+                    title="Get AI budget recommendations"
+                  >
+                    ✨{" "}
+                    {aiSuggestionMutation.isPending ? "Thinking..." : "Ask AI"}
+                  </button>
+                  <button
+                    onClick={handleSaveBudgets}
+                    disabled={!hasChanges || saveBudgets.isPending}
+                    className="px-3 py-1 text-sm bg-black text-white rounded-md disabled:opacity-50"
+                  >
+                    {saveBudgets.isPending ? "Saving..." : "Save"}
+                  </button>
+                </div>
               </div>
               <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {Object.entries(categoryTotals).map(([category, total]) => (
@@ -151,13 +212,15 @@ export default function Home() {
                         placeholder="0.00"
                       />
                     </div>
-                    <p className="text-xs text-gray-500 text-right">
-                      Spent{" "}
-                      {new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                      }).format(total)}
-                    </p>
+                    <div className="text-xs text-gray-500 text-right flex justify-end items-center gap-3">
+                      {previousBudgets &&
+                        previousBudgets[category] !== undefined && (
+                          <span className="text-gray-400 italic">
+                            (was: {formatCurrency(previousBudgets[category])})
+                          </span>
+                        )}
+                      <span>Spent: {formatCurrency(total)}</span>
+                    </div>
                   </div>
                 ))}
               </div>

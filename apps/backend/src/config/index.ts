@@ -10,6 +10,9 @@ const envSchema = z.object({
   PLAID_SECRET: z.string().optional(),
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).optional(),
   BACKEND_PUBLIC_URL: z.string().url().optional(),
+  AZURE_OPENAI_ENDPOINT: z.string().url().min(1),
+  AZURE_OPENAI_API_KEY: z.string().min(1),
+  AZURE_OPENAI_DEPLOYMENT: z.string().min(1),
 });
 
 export const env = envSchema.parse({
@@ -22,4 +25,7 @@ export const env = envSchema.parse({
   PLAID_SECRET: process.env.PLAID_SECRET,
   PLAID_ENV: process.env.PLAID_ENV,
   BACKEND_PUBLIC_URL: process.env.BACKEND_PUBLIC_URL,
+  AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
+  AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
+  AZURE_OPENAI_DEPLOYMENT: process.env.AZURE_OPENAI_DEPLOYMENT,
 });
