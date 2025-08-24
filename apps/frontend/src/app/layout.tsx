@@ -43,16 +43,6 @@ export default function RootLayout({
               {children}
             </ThemeProvider>
           </QueryProvider>
-          <QueryProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="light"
-              enableSystem
-              disableTransitionOnChange
-            >
-              {children}
-            </ThemeProvider>
-          </QueryProvider>
         </body>
       </html>
     </ClerkProvider>
