@@ -229,7 +229,7 @@ export default function Home() {
                 </AlertTitle>
                 <AlertDescription>
                   {me.activeChallenge.instruction ??
-                    `Try to avoid ${me.activeChallenge.categoryToAvoid} tomorrow to boost your Karma Score.`}
+                    `Try to avoid ${me.activeChallenge.instruction} tomorrow to boost your Karma Score.`}
                 </AlertDescription>
               </Alert>
             </div>
