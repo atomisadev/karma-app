@@ -7,6 +7,18 @@ import { useUserProfile } from "@/app/(app)/_hooks/use-user";
 import { useAuth } from "@clerk/nextjs";
 import { usePlaidLink } from "react-plaid-link";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+
 type Tx = {
   amount: number;
   date: string;
@@ -106,128 +118,117 @@ export default function OnboardingPage() {
 
   if (isLoading) {
     return (
-      <div className="font-sans min-h-screen p-8 max-w-3xl mx-auto flex flex-col gap-8 items-center justify-center">
-        <div className="rounded-xl border p-6 flex flex-col gap-4 text-center">
-          <h1 className="text-2xl font-semibold">Loading your data...</h1>
-          <p className="text-gray-600">
-            Please wait while we fetch your transactions.
-          </p>
-        </div>
+      <div className="min-h-screen p-8 max-w-3xl mx-auto flex items-center justify-center">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Loading your data...</CardTitle>
+            <CardDescription>
+              Please wait while we fetch your transactions.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
   if (!isConnected) {
     return (
-      <div className="font-sans min-h-screen p-8 max-w-3xl mx-auto flex flex-col gap-8 items-center justify-center">
-        <div className="rounded-xl border p-6 flex flex-col gap-4 text-center">
-          <h1 className="text-2xl font-semibold mb-2">Welcome!</h1>
-          <p className="text-gray-600">
-            Connect your bank account to start your financial journey with
-            Karma.
-          </p>
-          <div className="flex justify-center items-center mt-4">
-            <button
-              disabled={!ready}
-              onClick={() => open()}
-              className="px-4 py-2 bg-black text-white rounded"
-            >
+      <div className="min-h-screen p-8 max-w-3xl mx-auto flex items-center justify-center">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle><h1 className="text-2xl font-semibold text-center">Welcome!</h1></CardTitle>
+            <CardDescription>
+              Connect your bank account to start your financial journey with Karma.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Button disabled={!ready} onClick={() => open()}>
               Connect your bank
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="font-sans min-h-screen flex items-center justify-center p-8 bg-gray-50">
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-        onClick={() => {}}
-      >
-        {showIncomeModal && (
-          <div
-            className="relative rounded-xl border bg-white p-8 w-full max-w-sm flex flex-col gap-6 text-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h1 className="text-2xl font-semibold">Your Monthly Income</h1>
-            <p className="text-4xl font-bold">
-              {new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency: "USD",
-              }).format(income30)}
-            </p>
-            <p className="text-sm text-gray-600">
-              This is the estimated total income from your transactions over the
-              last 30 days.
-            </p>
-            <button
-              onClick={() => setShowIncomeModal(false)}
-              className="px-4 py-2 bg-black text-white rounded-md mt-4"
-            >
-              Yes, I understand
-            </button>
-          </div>
-        )}
+      <Dialog open={showIncomeModal} onOpenChange={setShowIncomeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Your Monthly Income</DialogTitle>
+            <DialogDescription>
+              This is the estimated total income from your transactions over the last 30 days.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-4xl font-bold text-center my-4">
+            {new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: "USD",
+            }).format(income30)}
+          </p>
+          <Button className="w-full" onClick={() => setShowIncomeModal(false)}>
+            Yes, I understand
+          </Button>
+        </DialogContent>
+      </Dialog>
 
-        {!showIncomeModal && Object.keys(categoryTotals).length > 0 && (
-          <div
-            className="relative rounded-xl border bg-white p-8 w-full max-w-xl flex flex-col gap-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-semibold mb-4">
-              Set your budgets based on spending
-            </h2>
-            <p className="text-sm text-gray-600">
-              We’ve detected your spending categories from the last 30 days. You
-              can set a monthly budget for each, or leave them as the default.
-            </p>
-            <div className="grid grid-cols-1 gap-3 max-h-[50vh] overflow-y-auto pr-2">
-              {Object.entries(categoryTotals).map(([cat, total]) => (
-                <div
-                  key={cat}
-                  className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 border rounded-md p-3"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-lg">{cat}</div>
-                    <div className="text-sm text-gray-600">
-                      Last 30 days:{" "}
-                      <span className="font-bold">
-                        {new Intl.NumberFormat("en-US", {
-                          style: "currency",
-                          currency: "USD",
-                        }).format(total)}
-                      </span>
+      {!showIncomeModal && Object.keys(categoryTotals).length > 0 && (
+        <Card className="w-full max-w-xl">
+          <CardHeader>
+            <CardTitle>Set your budgets based on spending</CardTitle>
+            <CardDescription>
+              We’ve detected your spending categories from the last 30 days. You can set a monthly budget for each, or leave them as the default.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[50vh] pr-2">
+              <div className="space-y-3">
+                {Object.entries(categoryTotals).map(([cat, total]) => (
+                  <div
+                    key={cat}
+                    className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 border rounded-md p-3"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-lg">{cat}</div>
+                      <div className="text-sm text-muted-foreground">
+                        Last 30 days:{" "}
+                        <span className="font-bold">
+                          {new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                          }).format(total)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm">Budget</label>
+                      <Input
+                        type="number"
+                        className="w-28 text-right"
+                        value={mergedBudgets[cat] ?? 0}
+                        onChange={(e) =>
+                          setBudgets((prev) => ({
+                            ...prev,
+                            [cat]: Number(e.target.value || 0),
+                          }))
+                        }
+                      />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-700">Budget</label>
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-28"
-                      value={mergedBudgets[cat] ?? 0}
-                      onChange={(e) =>
-                        setBudgets((prev) => ({
-                          ...prev,
-                          [cat]: Number(e.target.value || 0),
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
+                ))}
+              </div>
+            </ScrollArea>
+            <Button
+              className="w-full mt-4"
               disabled={saving}
               onClick={handleComplete}
-              className="px-4 py-2 bg-black text-white rounded-md mt-4"
             >
               {saving ? "Saving…" : "Save budgets and finish"}
-            </button>
-          </div>
-        )}
-      </div>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
